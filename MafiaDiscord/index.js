@@ -78,14 +78,16 @@ client.on('messageCreate', async (message) => {
             .setCustomId('stop')
             .setLabel('Stop Bot')
             .setStyle(ButtonStyle.Danger);
+        const voiceAllowButton = new ButtonBuilder().setCustomId('voice').setLabel('voice Bot').setStyle(ButtonStyle.Primary);
 
         const row = new ActionRowBuilder()
-            .addComponents(startButton, stopButton);
+            .addComponents(startButton, stopButton,voiceAllowButton);
 
         await message.channel.send({
             content: 'Click a button to start or stop the bot:',
             components: [row],
         });
+     
     }
 
     if (message.content === "!control" && isRunning) {
@@ -93,10 +95,20 @@ client.on('messageCreate', async (message) => {
             .setCustomId('vote')
             .setLabel('Vote for Mafia')
             .setStyle(ButtonStyle.Primary);
+            const startButton = new ButtonBuilder()
+            .setCustomId('start')
+            .setLabel('Start Bot')
+            .setStyle(ButtonStyle.Success);
+
+        const stopButton = new ButtonBuilder()
+            .setCustomId('stop')
+            .setLabel('Stop Bot')
+            .setStyle(ButtonStyle.Danger);
+        const voiceAllowButton = new ButtonBuilder().setCustomId('voice').setLabel('voice Bot').setStyle(ButtonStyle.Primary);
 
         const row = new ActionRowBuilder()
-            .addComponents(voteButton);
-
+            .addComponents(voteButton,startButton,stopButton,voiceAllowButton);
+        
         await message.channel.send({
             content: 'Click to vote for the Mafia:',
             components: [row],
@@ -143,6 +155,10 @@ client.on('interactionCreate', async (interaction) => {
         await voteMafia(interaction.channel, personIndex); // 투표 함수 호출
         await interaction.reply(`You voted for ${players[personIndex].name}!`); // 응답 메시지
     }
+    else if (interaction.customId.startsWith('voice'))
+        {
+            isVoiceAllowed = !isVoiceAllowed;
+        }
 });
 
 client.login(discordBotToken);
