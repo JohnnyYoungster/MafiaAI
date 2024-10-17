@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, ButtonBuilder, ActionRowBuilder, ButtonStyle } from 'discord.js';
+import { Client, GatewayIntentBits, ButtonBuilder, ActionRowBuilder, ButtonStyle,EmbedBuilder, User } from 'discord.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -9,21 +9,25 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.GuildMessageTyping,
     ],
+    
 });
 
 const discordBotToken = process.env.BotToken;
 
 // 플레이어와 해당 텍스트 리스트를 설정
 const players = [
-    { name: 'Player1', texts: ['Hello!', 'How are you?', 'Nice to meet you!'], role: 'Mafia' },
-    { name: 'Player2', texts: ['Hey!', 'What\'s up?', 'See you soon!'], role: 'Civil' },
-    { name: 'Player3', texts: ['Hi there!', 'Good day!', 'Take care!'], role: 'Civil' },
+    { name: 'DomeLover', texts: ['Do you know Dome?', 'I Like Dome the most', 'Lets eat domme together!'], role: 'Mafia' },
+    { name: 'Nubjook', texts: ['I hate assignments!', 'I want vacation?', 'Dobby is free now'], role: 'Civil' },
+    { name: 'Hos Fan', texts: ['Heroes of the storm is goat', 'Siuuuuu!!!!', 'Hos > lol '], role: 'Civil' },
 ];
 
 let interval;
 let isRunning = false; // 반복 작업 여부 추적
 let isVoiceAllowed = false;
+let dayTime = 1;
+let isUserTyping = false;
 
 // 랜덤한 플레이어와 텍스트를 채팅에 보내는 함수
 const voteMafia = async (channel, personIndex) => {
@@ -33,10 +37,12 @@ const voteMafia = async (channel, personIndex) => {
     // TTS로 말하게 하기
     await channel.send({ content: message, tts: isVoiceAllowed });
     players.splice(personIndex, 1); // 선택된 플레이어 제거
+    dayTime =dayTime +1;
 };
 
 // 랜덤 메시지 전송 함수
 const sendRandomMessage = async (channel) => {
+    if(isUserTyping) return;
     const randomPlayer = players[Math.floor(Math.random() * players.length)];
     const randomText = randomPlayer.texts[Math.floor(Math.random() * randomPlayer.texts.length)];
     
@@ -73,6 +79,11 @@ client.on('messageCreate', async (message) => {
             .setCustomId('start')
             .setLabel('Start Bot')
             .setStyle(ButtonStyle.Success);
+            const dayEmbed = new EmbedBuilder()
+            .setColor(0x0099ff) // 임베드 색상 설정
+            .setTitle(`Day${dayTime}`)
+            .setDescription(`The game has started. Now is Day ${dayTime}` )  // Day 1 설명 추가
+            .setTimestamp(); 
 
         const stopButton = new ButtonBuilder()
             .setCustomId('stop')
@@ -83,10 +94,10 @@ client.on('messageCreate', async (message) => {
         const row = new ActionRowBuilder()
             .addComponents(startButton, stopButton,voiceAllowButton);
 
-        await message.channel.send({
-            content: 'Click a button to start or stop the bot:',
-            components: [row],
-        });
+            await message.channel.send({
+                embeds: [dayEmbed],  // 임베드 메시지
+                components: [row],   // 버튼
+            });
      
     }
 
@@ -104,6 +115,13 @@ client.on('messageCreate', async (message) => {
             .setCustomId('stop')
             .setLabel('Stop Bot')
             .setStyle(ButtonStyle.Danger);
+        const dayEmbed = new EmbedBuilder()
+            .setColor(0x0099ff) // 임베드 색상 설정
+            .setTitle(`Day${dayTime}`)
+            .setDescription(`The game has started. Now is Day ${dayTime}` )  // Day 1 설명 추가
+            .setTimestamp(); 
+
+            
         const voiceAllowButton = new ButtonBuilder().setCustomId('voice').setLabel('voice Bot').setStyle(ButtonStyle.Primary);
 
         const row = new ActionRowBuilder()
@@ -111,10 +129,26 @@ client.on('messageCreate', async (message) => {
         
         await message.channel.send({
             content: 'Click to vote for the Mafia:',
+            embeds:[dayEmbed],
             components: [row],
         });
         
     }
+    else if (isUserTyping )
+    {
+        isUserTyping = false;
+        await startRandomMessages(message.channel);
+    }
+});
+
+client.on('typingStart',async(typing)=>{
+    if(!isRunning && isUserTyping) return;
+    const user = typing.user; // typing 객체에서 user 가져오기
+    isUserTyping = true;
+    stopRandomMessages();
+    console.log("Stop others")
+    // typing.channel.send({content : 
+    //     `${user.username} is typing , mute other players`})
 });
 
 // 버튼 클릭 시 실행되는 코드
