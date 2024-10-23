@@ -201,10 +201,28 @@ fs.readFile('Characters.txt', 'utf8', async (err, data) => {
         if (mafiaRoleIndexes.includes(index)) role = MafiaRole.MAFIA;
         players.push(new Player(data[0], role, data[1], confidence));
     }
-    start();
+    randomStart();
 });
 
 let conversation="Game Master: The day starts and the town is notified from the government that there is a Mafia about to murder all of them. Day 1 discussion ensues. \n";
+
+function choosePlayer(players) {
+  // Calculate the total confidence
+  const totalConfidence = players.reduce((total, player) => total + player.confidence, 0);
+
+  // Generate a random number between 0 and totalConfidence
+  const randomValue = Math.random() * totalConfidence;
+
+  let cumulativeConfidence = 0;
+
+  // Select the player based on confidence
+  for (const player of players) {
+      cumulativeConfidence += player.confidence;
+      if (randomValue < cumulativeConfidence) {
+          return player; // Return the chosen player
+      }
+  }
+}
 
 
 async function start() {
@@ -216,3 +234,16 @@ async function start() {
         conversation+=player.name+": "+response.content;
     }
 }
+
+async function randomStart() {
+  while(true){
+      const player=choosePlayer(players)
+      const response = await player.speak(conversation);
+      // console.log(player.name);
+      console.log(player.name.red);
+      console.log(response.content);
+      conversation+=player.name+": "+response.content;
+  }
+}
+
+
