@@ -204,11 +204,15 @@ fs.readFile('Characters.txt', 'utf8', async (err, data) => {
     start();
 });
 
+let conversation="Game Master: The day starts and the town is notified from the government that there is a Mafia about to murder all of them. Day 1 discussion ensues. \n";
+
+
 async function start() {
     for (const player of players) {
-        const response = await player.speak("Game Master: The day starts and the town is notified from the government that there is a Mafia about to murder all of them. Day 1 discussion ensues.");
+        const response = await player.speak(conversation);
         // console.log(player.name);
         console.log(player.name.red);
         console.log(response.content);
+        conversation+=player.name+": "+response.content;
     }
 }
