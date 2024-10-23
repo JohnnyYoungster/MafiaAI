@@ -205,10 +205,11 @@ fs.readFile('Characters.txt', 'utf8', async (err, data) => {
 });
 
 let conversation="Game Master: The day starts and the town is notified from the government that there is a Mafia about to murder all of them. Day 1 discussion ensues. \n";
-
-function choosePlayer(players) {
+let lastChosenPlayerName="";
+function choosePlayer(players, lastChosenPlayerName) {
   // Calculate the total confidence
-  const totalConfidence = players.reduce((total, player) => total + player.confidence, 0);
+  const filteredPlayers= players.filter(player=> player.name!=lastChosenPlayerName);
+  const totalConfidence = filteredPlayers.reduce((total, player) => total + player.confidence, 0);
 
   // Generate a random number between 0 and totalConfidence
   const randomValue = Math.random() * totalConfidence;
@@ -216,7 +217,7 @@ function choosePlayer(players) {
   let cumulativeConfidence = 0;
 
   // Select the player based on confidence
-  for (const player of players) {
+  for (const player of filteredPlayers) {
       cumulativeConfidence += player.confidence;
       if (randomValue < cumulativeConfidence) {
           return player; // Return the chosen player
@@ -237,7 +238,8 @@ async function start() {
 
 async function randomStart() {
   while(true){
-      const player=choosePlayer(players)
+      const player=choosePlayer(players,lastChosenPlayerName);
+      lastChosenPlayerName=player.name;
       const response = await player.speak(conversation);
       // console.log(player.name);
       console.log(player.name.red);

@@ -82,6 +82,8 @@ export function createSetting(name, confidence_level, role, role_motivation, all
 
     Here is an example text format you should follow. (Focus on its format, not its content, and leave out the quotation marks):
     "This is a sample text format."
+
+    Reply with a plain text without any formatting. Don't use new lines, lists, or any other formatting. Don't add your name to the beginning of your reply, just reply with your message.
     `;
 
 }
