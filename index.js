@@ -157,13 +157,13 @@ class Player {
     }
 
     getKnownAllies() {
-        const mafiaPlayers = players.filter(player => player.role === MafiaRole.MAFIA && player.name !== this.name)
+        const mafiaPlayers = players.filter(player => player.role === MafiaRole.MAFIA && player.name !== this.name && player.alive==true)
                                      .map(player => player.name);
         return this.role === MafiaRole.MAFIA ? "You have no known allies" : mafiaPlayers.join(', ');
     }
 
     getOtherPlayers() {
-        const otherPlayers = players.filter(player => player.name !== this.name)
+        const otherPlayers = players.filter(player => player.name !== this.name && player.alive==true)
                                      .map(player => player.name);
         return otherPlayers.join(', ');
     }

@@ -14,7 +14,7 @@ export function createSetting(name, confidence_level, role, role_motivation, all
     [START OF GAME STORY] 
     ${game_story} 
     
-    Your companions in this game are ${other_players}.
+    Your companions in this game who are currently alive are ${other_players}.
     [END OF GAME STORY] 
 
     This is your personal backstory, which you can use to inform your character's personality and behavior: 
@@ -85,3 +85,66 @@ export function createSetting(name, confidence_level, role, role_motivation, all
     `;
 
 }
+
+const GAME_MASTER_VOTING_FIRST_ROUND_COMMAND = `Game master: It's time to vote! Choose one player to eliminate. 
+You must vote; you must pick somebody even if you don't see a reason. You cannot choose yourself or nobody. 
+Your response format: {"player_to_eliminate": "player_name", "reason": "your_reason"}
+
+Make sure your response is valid JSON. For example:
+{"player_to_eliminate": "John", "reason": "I don't trust him."}`;
+
+
+export const GAME_MASTER_NIGHT_MAFIA_COMMAND = `
+Game Master: Choose a player you are going to eliminate from the game. You must choose somebody even if you 
+don't see a reason. You cannot choose yourself or nobody.`;
+
+export const GAME_MASTER_NIGHT_DOCTOR_COMMAND = `
+Game Master: Choose a player you are going to protect this night. You must choose somebody even if you 
+don't see a reason. You cannot choose nobody.`;
+
+export const GAME_MASTER_NIGHT_DETECTIVE_COMMAND = `
+Game Master: Choose a player you are going to inspect this night. You must choose somebody even if you 
+don't see a reason. You cannot choose yourself or nobody.`;
+
+
+
+// const GAME_MASTER_VOTING_FIRST_ROUND_COMMAND = (latestMessages) => `
+// Game master: It's time to vote! Choose one player to eliminate. 
+// You must vote; you must pick somebody even if you don't see a reason. You cannot choose yourself or nobody. 
+// Your response format: {"player_to_eliminate": "player_name", "reason": "your_reason"}
+
+// Latest messages from other players you might have missed:
+// ${latestMessages}
+
+// Make sure your response is valid JSON. For example:
+// {"player_to_eliminate": "John", "reason": "I don't trust him."}`;
+
+// const GAME_MASTER_VOTING_FIRST_ROUND_RESULT = (leaders) => `
+// Game Master: There are a few leaders in this first round of voting: ${leaders}.
+// Let's hear from each of them. They have 1 message to speak for themselves. Then you all will vote to eliminate one of 
+// them.`;
+
+// const GAME_MASTER_VOTING_FIRST_ROUND_DEFENCE_COMMAND = (latestMessages) => `
+// Game Master: A player has chosen you as a candidate for elimination. Protect yourself. 
+// Explain why you should not be eliminated.
+
+// Latest messages from other players you might have missed:
+// ${latestMessages}`;
+
+// const GAME_MASTER_VOTING_SECOND_ROUND_COMMAND = (leaders, latestMessages) => `
+// Game master: It's time for the final vote! Choose one player to eliminate from the following list: ${leaders}
+// Your response format: {"player_to_eliminate": "player_name", "reason": "your_reason"}
+
+// Latest messages from other players you might have missed:
+// ${latestMessages}
+
+// Make sure your response is valid JSON. For example:
+// {"player_to_eliminate": "John", "reason": "I don't trust him."}`;
+
+// const GAME_MASTER_VOTING_SECOND_ROUND_RESULT = (leader, role) => `
+// Game Master: You decided to eliminate the following player: ${leader}. This player had a role of ${role}. 
+// Now it is time to start the night.`;
+
+// const GAME_MASTER_NIGHT_DOCTOR_COMMAND = `
+// Game Master: Choose a player you are going to eliminate from the game. You must choose somebody even if you 
+// don't see a reason. You cannot choose yourself or nobody.`;
