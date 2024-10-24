@@ -22,6 +22,11 @@ const players = [
     { name: 'Nubjook', texts: ['I hate assignments!', 'I want vacation?', 'Dobby is free now'], role: 'Civil' },
     { name: 'Hos Fan', texts: ['Heroes of the storm is goat', 'Siuuuuu!!!!', 'Hos > lol '], role: 'Civil' },
 ];
+const votePaper = players.map(players =>({
+    name :players.name,
+    votes : 0
+})
+);
 
 let interval;
 let isRunning = false; // 반복 작업 여부 추적
@@ -29,26 +34,65 @@ let isVoiceAllowed = false;
 let dayTime = 1;
 let isUserTyping = false;
 
+
 // 랜덤한 플레이어와 텍스트를 채팅에 보내는 함수
 const voteMafia = async (channel, personIndex) => {
+
     const electedPerson = players[personIndex];
     const message = `${electedPerson.name} is selected, The people's role is ${electedPerson.role}`;
+    
     
     // TTS로 말하게 하기
     await channel.send({ content: message, tts: isVoiceAllowed });
     players.splice(personIndex, 1); // 선택된 플레이어 제거
     dayTime =dayTime +1;
-};
+    startRandomMessages();
 
+    
+};
+const voteMafiaBasic = (personindex) =>
+    {
+      votePaper[personindex].votes +=1;
+
+   } 
+const voteMafiaBot = async (player,personindex,channel) =>
+    {
+        voteMafiaBasic(personindex);
+        await channel.send(`${player.name} vote for ${players[personindex].name}`);
+   }
+const voteMafiaHuman = async(personindex,channel) =>
+    {
+        voteMafiaBasic(personindex);
+        const electedPeronName = votePaper.reduce((prev,cur) =>{
+         return cur.votes>prev.votes ?cur :prev;
+        }).name;
+        const electedPeronIndex = players.findIndex(player => player.name === electedPeronName);
+        voteMafia(channel,electedPeronIndex);
+        
+ }
+const createWebhooks = async (channel) => {
+    for (const player of players) {
+        // Create a webhook for each player
+        const webhook = await channel.createWebhook({
+            name: player.name,
+            // avatar: `https://cdn.discordapp.com/embed/avatars/${Math.floor(Math.random() * 5)}.png`, 
+        });
+        player.webhook = webhook;
+    }
+};
 // 랜덤 메시지 전송 함수
 const sendRandomMessage = async (channel) => {
-    if(isUserTyping) return;
+    // if(isUserTyping) return;
     const randomPlayer = players[Math.floor(Math.random() * players.length)];
     const randomText = randomPlayer.texts[Math.floor(Math.random() * randomPlayer.texts.length)];
     
     // TTS로 말하게 하기
-    await channel.send({ content: `${randomPlayer.name}: ${randomText}`, tts: isVoiceAllowed });
+    await randomPlayer.webhook.send({
+        content: randomText,
+        tts: isVoiceAllowed,
+    });
 };
+
 
 // 반복 작업을 시작하는 함수
 const startRandomMessages = async (channel) => {
@@ -98,10 +142,11 @@ client.on('messageCreate', async (message) => {
                 embeds: [dayEmbed],  // 임베드 메시지
                 components: [row],   // 버튼
             });
+            await createWebhooks(message.channel)
      
     }
 
-    if (message.content === "!control" && isRunning) {
+    if (message.content === "!control" ) {
         const voteButton = new ButtonBuilder()
             .setCustomId('vote')
             .setLabel('Vote for Mafia')
@@ -118,7 +163,7 @@ client.on('messageCreate', async (message) => {
         const dayEmbed = new EmbedBuilder()
             .setColor(0x0099ff) // 임베드 색상 설정
             .setTitle(`Day${dayTime}`)
-            .setDescription(`The game has started. Now is Day ${dayTime}` )  // Day 1 설명 추가
+            .setDescription(`Now is Day ${dayTime}` )  // Day 1 설명 추가
             .setTimestamp(); 
 
             
@@ -134,22 +179,22 @@ client.on('messageCreate', async (message) => {
         });
         
     }
-    else if (isUserTyping )
-    {
-        isUserTyping = false;
-        await startRandomMessages(message.channel);
-    }
+    // else if (isUserTyping )
+    // {
+    //     isUserTyping = false;
+    //     await startRandomMessages(message.channel);
+    // }
 });
 
-client.on('typingStart',async(typing)=>{
-    if(!isRunning && isUserTyping) return;
-    const user = typing.user; // typing 객체에서 user 가져오기
-    isUserTyping = true;
-    stopRandomMessages();
-    console.log("Stop others")
-    // typing.channel.send({content : 
-    //     `${user.username} is typing , mute other players`})
-});
+// client.on('typingStart',async(typing)=>{
+//     if(!isRunning && isUserTyping) return;
+//     const user = typing.user; // typing 객체에서 user 가져오기
+//     isUserTyping = true;
+//     stopRandomMessages();
+//     console.log("Stop others")
+//     // typing.channel.send({content : 
+//     //     `${user.username} is typing , mute other players`})
+// });
 
 // 버튼 클릭 시 실행되는 코드
 client.on('interactionCreate', async (interaction) => {
@@ -178,16 +223,21 @@ client.on('interactionCreate', async (interaction) => {
         );
 
         const row = new ActionRowBuilder().addComponents(voteButtons); // 버튼들을 하나의 행으로 그룹화
-
+        await voteMafiaBot(players[0],0,interaction.channel);
+        await voteMafiaBot(players[1],0,interaction.channel);
+        await voteMafiaBot(players[2],0,interaction.channel);
+        
         await interaction.reply({
             content: 'Choose a player to vote for:',
             components: [row],
             ephemeral: true, // 이 옵션을 통해 특정 사용자에게만 보이는 메시지로 설정할 수 있습니다
         });
-    } else if (interaction.customId.startsWith('vote_')) {
+    } else if (interaction.customId.startsWith('vote_') && isRunning) {
+        stopRandomMessages();
+        isRunning = false;
         const personIndex = parseInt(interaction.customId.split('_')[1]); // 인덱스 추출
-        await voteMafia(interaction.channel, personIndex); // 투표 함수 호출
-        await interaction.reply(`You voted for ${players[personIndex].name}!`); // 응답 메시지
+        await voteMafiaHuman( personIndex,interaction.channel); // 투표 함수 호출
+        await interaction.reply(`You voted for ${personIndex}!`); // 응답 메시지
     }
     else if (interaction.customId.startsWith('voice'))
         {
