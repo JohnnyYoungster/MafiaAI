@@ -206,6 +206,7 @@ fs.readFile('Characters.txt', 'utf8', async (err, data) => {
 
 let conversation="Game Master: The day starts and the town is notified from the government that there is a Mafia about to murder all of them. Day 1 discussion ensues. \n";
 let lastChosenPlayerName="";
+
 function choosePlayer(players, lastChosenPlayerName) {
   // Calculate the total confidence
   const filteredPlayers= players.filter(player=> player.name!=lastChosenPlayerName);
@@ -238,14 +239,19 @@ async function start() {
 
 async function randomStart() {
   while(true){
-      const player=choosePlayer(players,lastChosenPlayerName);
-      lastChosenPlayerName=player.name;
-      const response = await player.speak(conversation);
-      // console.log(player.name);
-      console.log(player.name.red);
-      console.log(response.content);
-      conversation+=player.name+": "+response.content;
+    const player=choosePlayer(players,lastChosenPlayerName);
+    lastChosenPlayerName=player.name;
+    const response = await player.speak(conversation);
+    // console.log(player.name);
+    console.log(player.name.red);
+    console.log(response.content);
+    conversation+=player.name+": "+response.content;
   }
+}
+
+
+function playerSpeak(username, content){
+  conversation+= username+": "+content;
 }
 
 

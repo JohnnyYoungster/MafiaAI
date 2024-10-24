@@ -1,5 +1,13 @@
 import { Client, GatewayIntentBits, ButtonBuilder, ActionRowBuilder, ButtonStyle,EmbedBuilder, User } from 'discord.js';
 import dotenv from 'dotenv';
+import { extractPersonality, NPCPrompt,getPrompt, basicPrompt } from './ai.js';
+import 'dotenv/config';
+import path from 'path';
+import fs from 'fs';
+import axios from 'axios';
+import 'colors';
+import { createSetting } from './settingPrompt.js';
+
 
 dotenv.config();
 
@@ -84,10 +92,15 @@ const createWebhooks = async (channel) => {
 const sendRandomMessage = async (channel) => {
     // if(isUserTyping) return;
     const randomPlayer = players[Math.floor(Math.random() * players.length)];
-    const randomText = randomPlayer.texts[Math.floor(Math.random() * randomPlayer.texts.length)];
-    
+    //const randomText = randomPlayer.texts[Math.floor(Math.random() * randomPlayer.texts.length)];
+    const randomText=await botSpeak();
+
     // TTS로 말하게 하기
-    await randomPlayer.webhook.send({
+    // await randomPlayer.webhook.send({
+    //     content: randomText,
+    //     tts: isVoiceAllowed,
+    // });
+    await channel.send({
         content: randomText,
         tts: isVoiceAllowed,
     });
@@ -246,3 +259,154 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.login(discordBotToken);
+
+
+
+
+const MafiaRole = {
+    MAFIA: 'Mafia',
+    DOCTOR: 'Doctor',
+    DETECTIVE: 'Detective',
+    VILLAGER: 'Villager'
+};
+
+const role_motivations = {
+    [MafiaRole.MAFIA]: 'Seeks to control the town from the shadows, operating with cunning and secrecy. Their goal is to eliminate non-Mafia players while protecting their own. They must act covertly, executing their plans under the cover of night and misleading others during the day to conceal their true identity.',
+    [MafiaRole.DOCTOR]: 'Dedicated to saving lives, the Doctor works to protect those in danger from Mafia attacks. Their main goal is to identify and eliminate the Mafia threat, using their night actions to safeguard potential targets. All non-Mafia players are allies in the quest for peace.',
+    [MafiaRole.DETECTIVE]: 'With a keen eye for deceit, the Detective investigates players to uncover their true alignments. Their mission is to use this knowledge to guide the town in rooting out the Mafia menace, employing their night actions to gather crucial intelligence.',
+    [MafiaRole.VILLAGER]: 'As a regular townsperson, the Villager lacks special actions but plays a critical role in discussions and votes to eliminate the Mafia threat. Vigilance and collaboration with fellow non-Mafia players are their main weapons in the quest for safety and order.'
+};
+
+class Player {
+    constructor(name, role, personality, confidence) {
+        this.name = name;
+        this.role = role;
+        this.alive = true;
+        this.personality = personality;
+        this.confidence = confidence;
+    }
+
+    speak(conversation) {
+        const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
+            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality);
+        const prompt = NPCPrompt(setting);
+        return prompt(conversation);
+    }
+
+    getAllyRoles() {
+        return this.role === MafiaRole.MAFIA ? [MafiaRole.MAFIA] : [MafiaRole.DOCTOR, MafiaRole.DETECTIVE, MafiaRole.VILLAGER];
+    }
+
+    getEnemyRoles() {
+        return this.role === MafiaRole.MAFIA ? [MafiaRole.DOCTOR, MafiaRole.DETECTIVE, MafiaRole.VILLAGER] : [MafiaRole.MAFIA];
+    }
+
+    getKnownAllies() {
+        const mafiaPlayers = players.filter(player => player.role === MafiaRole.MAFIA && player.name !== this.name && player.alive==true)
+                                     .map(player => player.name);
+        return this.role === MafiaRole.MAFIA ? "You have no known allies" : mafiaPlayers.join(', ');
+    }
+
+    getOtherPlayers() {
+        const otherPlayers = players.filter(player => player.name !== this.name && player.alive==true)
+                                     .map(player => player.name);
+        return otherPlayers.join(', ');
+    }
+}
+
+function assignRoles(arr) {
+    const numToSelect = Math.floor(arr.length / 4);
+    const indexes = Array.from(Array(arr.length).keys());
+    for (let i = indexes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indexes[i], indexes[j]] = [indexes[j], indexes[i]];
+    }
+    return indexes.slice(0, numToSelect);
+}
+
+let characters = "";
+let bots = [];
+fs.readFile('Characters.txt', 'utf8', async (err, data) => {
+    if (err) {
+        console.error(err);
+        return;
+    }
+    characters = data.split('\n');
+    const mafiaRoleIndexes = assignRoles(characters);
+
+    // Create players and await the extraction of personalities
+    for (const [index, line] of characters.entries()) {
+        const data = line.trim().split(';');
+        let confidence = 0;
+
+        // Wait for personality extraction
+        confidence = await extractPersonality(data[1]).then(res => parseInt(res.content, 10)).catch(console.error);
+
+        let role = MafiaRole.VILLAGER;
+        if (mafiaRoleIndexes.includes(index)) role = MafiaRole.MAFIA;
+        bots.push(new Player(data[0], role, data[1], confidence));
+    }
+    //randomStart();
+});
+
+let conversation="Game Master: The day starts and the town is notified from the government that there is a Mafia about to murder all of them. Day 1 discussion ensues. \n";
+let lastChosenPlayerName="";
+
+function choosePlayer(bots, lastChosenPlayerName) {
+  // Calculate the total confidence
+  const filteredPlayers= bots.filter(player=> player.name!=lastChosenPlayerName);
+  const totalConfidence = filteredPlayers.reduce((total, player) => total + player.confidence, 0);
+
+  // Generate a random number between 0 and totalConfidence
+  const randomValue = Math.random() * totalConfidence;
+
+  let cumulativeConfidence = 0;
+
+  // Select the player based on confidence
+  for (const player of filteredPlayers) {
+      cumulativeConfidence += player.confidence;
+      if (randomValue < cumulativeConfidence) {
+          return player; // Return the chosen player
+      }
+  }
+}
+
+
+async function start() {
+    for (const player of bots) {
+        const response = await player.speak(conversation);
+        // console.log(player.name);
+        console.log(player.name.red);
+        console.log(response.content);
+        conversation+=player.name+": "+response.content;
+    }
+}
+
+async function randomStart() {
+  while(true){
+    const player=choosePlayer(bots,lastChosenPlayerName);
+    lastChosenPlayerName=player.name;
+    const response = await player.speak(conversation);
+    // console.log(player.name);
+    console.log(player.name.red);
+    console.log(response.content);
+    conversation+=player.name+": "+response.content;
+  }
+}
+
+async function botSpeak(){
+    const player=choosePlayer(bots,lastChosenPlayerName);
+    lastChosenPlayerName=player.name;
+    const response = await player.speak(conversation);
+    // console.log(player.name);
+    console.log(player.name.red);
+    console.log(response.content);
+    conversation+=player.name+": "+response.content;
+    return response.content;
+}
+
+function playerSpeak(username, content){
+  conversation+= username+": "+content;
+}
+
+
