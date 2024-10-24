@@ -36,6 +36,7 @@ const votePaper = players.map(players =>({
 })
 );
 
+
 let interval;
 let isRunning = false; // 반복 작업 여부 추적
 let isVoiceAllowed = false;
@@ -78,32 +79,53 @@ const voteMafiaHuman = async(personindex,channel) =>
         voteMafia(channel,electedPeronIndex);
         
  }
-const createWebhooks = async (channel) => {
-    for (const player of players) {
-        // Create a webhook for each player
-        const webhook = await channel.createWebhook({
-            name: player.name,
-            // avatar: `https://cdn.discordapp.com/embed/avatars/${Math.floor(Math.random() * 5)}.png`, 
-        });
-        player.webhook = webhook;
-    }
-};
+const webHookUrls =
+[
+ process.env.player1_WebHook_url,
+process.env.player2_WebHook_url,
+process.env.player3_WebHook_url,
+process.env.player4_WebHook_url,
+process.env.player5_WebHook_url,
+process.env.player6_WebHook_url,
+process.env.player7_WebHook_url,
+
+];
+const webHookLis =[];
 // 랜덤 메시지 전송 함수
 const sendRandomMessage = async (channel) => {
     // if(isUserTyping) return;
-    const randomPlayer = players[Math.floor(Math.random() * players.length)];
+    //const randomPlayer = players[Math.floor(Math.random() * players.length)];
     //const randomText = randomPlayer.texts[Math.floor(Math.random() * randomPlayer.texts.length)];
-    const randomText=await botSpeak();
+    const botList=await botSpeak();
+    const botText ={ content:botList[0]
+    };
+    const botPlayer = botList[1];
+    let botWebHookUrl=''
+   webHookLis.forEach(element =>{
+        if(element[0]=== botPlayer.name ) botWebHookUrl = element[1];
+    });
+    try {
+        const result = await axios.post(botWebHookUrl, botText,{
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        console.log('Message sent successfully:', result.data);
+    }
+    catch (error) {
+        console.error('Error sending message:', error);
+    }
+
 
     // TTS로 말하게 하기
     // await randomPlayer.webhook.send({
     //     content: randomText,
     //     tts: isVoiceAllowed,
     // });
-    await channel.send({
-        content: randomText,
-        tts: isVoiceAllowed,
-    });
+    // await channel.send({
+    //     content: botText,
+    //     tts: isVoiceAllowed,
+    // });
 };
 
 
@@ -155,7 +177,7 @@ client.on('messageCreate', async (message) => {
                 embeds: [dayEmbed],  // 임베드 메시지
                 components: [row],   // 버튼
             });
-            await createWebhooks(message.channel)
+          
      
     }
 
@@ -346,12 +368,25 @@ fs.readFile('Characters.txt', 'utf8', async (err, data) => {
         if (mafiaRoleIndexes.includes(index)) role = MafiaRole.MAFIA;
         bots.push(new Player(data[0], role, data[1], confidence));
     }
+    for(let i =0;  i<bots.length; i ++  )
+        {
+            webHookLis.push([bots[i].name,webHookUrls[i]]);
+
+        }
+
     //randomStart();
 });
 
 let conversation="Game Master: The day starts and the town is notified from the government that there is a Mafia about to murder all of them. Day 1 discussion ensues. \n";
 let lastChosenPlayerName="";
 
+async function changeWebHookName(webhookUrl,newName){
+        await axios.patch(webhookUrl,{
+            name:newName
+        }) ;
+        console.log(`WebHook name   --> ${newName}`);
+
+}
 function choosePlayer(bots, lastChosenPlayerName) {
   // Calculate the total confidence
   const filteredPlayers= bots.filter(player=> player.name!=lastChosenPlayerName);
@@ -402,7 +437,7 @@ async function botSpeak(){
     console.log(player.name.red);
     console.log(response.content);
     conversation+=player.name+": "+response.content;
-    return response.content;
+    return [response.content,player];
 }
 
 function playerSpeak(username, content){
