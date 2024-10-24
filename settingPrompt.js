@@ -78,7 +78,7 @@ export function createSetting(name, confidence_level, role, role_motivation, all
     Reply with a plain text without any formatting. Don't use new lines, lists, or any other formatting. Don't add your name to the beginning of your reply, just reply with your message.
 
     
-    YOU ARE A SINGLE PARTICIPANT. Do not create responses from other players who aren't you.
+    YOU ARE A SINGLE PARTICIPANT. Do not create responses from other players who aren't you. Please only write responses that will come from ${name}.
 
     Here is an example text format you should follow. (Focus on its format, not its content, and leave out the quotation marks):
     "This is a sample text format."
@@ -88,7 +88,7 @@ export function createSetting(name, confidence_level, role, role_motivation, all
 
 }
 
-const GAME_MASTER_VOTING_FIRST_ROUND_COMMAND = `Game master: It's time to vote! Choose one player to eliminate. 
+export const GAME_MASTER_VOTING_COMMAND = `Game master: It's time to vote! Choose one player to eliminate. 
 You must vote; you must pick somebody even if you don't see a reason. You cannot choose yourself or nobody. 
 Your response format: {"player_to_eliminate": "player_name", "reason": "your_reason"}
 
@@ -96,18 +96,33 @@ Make sure your response is valid JSON. For example:
 {"player_to_eliminate": "John", "reason": "I don't trust him."}`;
 
 
+export const GAME_MASTER_VOTING_ANNOUNCEMENT = "Game Master: We will have a voting session, each of you will present who you'll vote to eliminate!\n ";
+
+export function votingResult(votedPlayer){
+    return `Game Master: As a result of your voting, ${votedPlayer} has been eliminated! \n`
+}
+
+export function nightResult(killedPlayer, detectedPlayer, detectedRole, autopsyPlayer, autopsyRole){
+    const killingResults= `Game Master: Nighttime passes, and you wake up to see that ${killedPlayer} has been killed by the Mafia!`;
+    const detectedResults=detectedPlayer==null ? "": `Also, as a result of your detective skills, you figured out that ${detectedPlayer} was actually a ${detectedRole}.`;
+    const autopsyResults= autopsyPlayer==null ? "":`Also, as a result of your detective skills, you figured out that ${autopsyPlayer} was actually a ${autopsyRole}.`;
+    const nextDayProposal = "Now a new day embarks and you must discuss once more. Start your discussion."
+    return killingResults+detectedResults+autopsyResults+nextDayProposal+'\n';
+}
+
+
+
 export const GAME_MASTER_NIGHT_MAFIA_COMMAND = `
 Game Master: Choose a player you are going to eliminate from the game. You must choose somebody even if you 
-don't see a reason. You cannot choose yourself or nobody.`;
+don't see a reason. You cannot choose yourself or nobody. The response needs to contain only the name of the player.`;
 
 export const GAME_MASTER_NIGHT_DOCTOR_COMMAND = `
 Game Master: Choose a player you are going to protect this night. You must choose somebody even if you 
-don't see a reason. You cannot choose nobody.`;
+don't see a reason. You cannot choose nobody. The response needs to contain only the name of the player.`;
 
 export const GAME_MASTER_NIGHT_DETECTIVE_COMMAND = `
 Game Master: Choose a player you are going to inspect this night. You must choose somebody even if you 
-don't see a reason. You cannot choose yourself or nobody.`;
-
+don't see a reason. You cannot choose yourself or nobody. The response needs to contain only the name of the player.`;
 
 
 // const GAME_MASTER_VOTING_FIRST_ROUND_COMMAND = (latestMessages) => `

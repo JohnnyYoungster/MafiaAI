@@ -2,7 +2,7 @@ import 'dotenv/config';
 import path from 'path';
 import fs from 'fs';
 import axios from 'axios';
-import { createSetting } from './settingPrompt.js';
+import { createSetting,GAME_MASTER_VOTING_COMMAND,GAME_MASTER_NIGHT_MAFIA_COMMAND,GAME_MASTER_VOTING_ANNOUNCEMENT,votingResult, nightResult } from './settingPrompt.js';
 import 'colors';
 
 export function basicPrompt(userPrompt, options = {}, context = []) {
@@ -148,6 +148,24 @@ class Player {
         return prompt(conversation);
     }
 
+    vote(conversation){
+        const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
+            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality); 
+        const prompt = NPCPrompt(setting, {
+            response_format: {type:'json_object',}
+        });
+        return prompt(conversation+"\n"+GAME_MASTER_VOTING_COMMAND);
+    }
+
+    kill(conversation){
+        const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
+            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality); 
+        const prompt = NPCPrompt(setting, {
+            response_format: {type:'json_object',}
+        });
+        return prompt(conversation+"\n"+GAME_MASTER_NIGHT_MAFIA_COMMAND);
+    }
+
     getAllyRoles() {
         return this.role === MafiaRole.MAFIA ? [MafiaRole.MAFIA] : [MafiaRole.DOCTOR, MafiaRole.DETECTIVE, MafiaRole.VILLAGER];
     }
@@ -209,7 +227,7 @@ let lastChosenPlayerName="";
 
 function choosePlayer(players, lastChosenPlayerName) {
   // Calculate the total confidence
-  const filteredPlayers= players.filter(player=> player.name!=lastChosenPlayerName);
+  const filteredPlayers= players.filter(player=> player.name!=lastChosenPlayerName && player.alive);
   const totalConfidence = filteredPlayers.reduce((total, player) => total + player.confidence, 0);
 
   // Generate a random number between 0 and totalConfidence
@@ -238,20 +256,64 @@ async function start() {
 }
 
 async function randomStart() {
-  while(true){
-    const player=choosePlayer(players,lastChosenPlayerName);
-    lastChosenPlayerName=player.name;
-    const response = await player.speak(conversation);
-    // console.log(player.name);
-    console.log(player.name.red);
+    while(true){
+    for(let i=0;i<5;i++){
+      const player=choosePlayer(players,lastChosenPlayerName);
+      lastChosenPlayerName=player.name;
+      const response = await player.speak(conversation);
+      // console.log(player.name);
+      console.log(player.name.blue);
+      console.log(response.content);
+      conversation+=player.name+": "+response.content;
+    }
+    let pendingConversation=GAME_MASTER_VOTING_ANNOUNCEMENT;
+    let arr=[];
+    for (const player of players) {
+      const response = await player.vote(conversation);
+      // console.log(player.name);
+      const JSONdata=toJSON(response.content);
+    //   console.log(JSONdata);
+      console.log(JSONdata.player_to_eliminate.red);
+      console.log(JSONdata.reason.green);
+      arr.push(JSONdata.player_to_eliminate);
+      pendingConversation+="I vote for "+JSONdata.player_to_eliminate;
+      pendingConversation+=JSONdata.reason;
+      pendingConversation+="\n";
+    }
+    conversation+=pendingConversation;
+    conversation+=votingResult(mostFrequentElement(arr));
+    players.filter(player=>player.name==mostFrequentElement(arr))[0].alive=false;
+    const mafiaPlayers=players.filter(player=>player.role==MafiaRole.MAFIA && player.alive==true);
+    const response = await mafiaPlayers[0].kill();
     console.log(response.content);
-    conversation+=player.name+": "+response.content;
-  }
+
+    conversation+=nightResult(response.content);
+    }
 }
 
+function mostFrequentElement(arr) {
+    const count = {};
+    let maxElement = null;
+    let maxCount = 0;
+
+    // Count occurrences of each element
+    for (const element of arr) {
+        count[element] = (count[element] || 0) + 1;
+
+        // Check if this element is now the most frequent
+        if (count[element] > maxCount) {
+            maxCount = count[element];
+            maxElement = element;
+        }
+    }
+
+    return maxElement;
+}
 
 function playerSpeak(username, content){
   conversation+= username+": "+content;
 }
 
-
+function toJSON(content) {
+    return JSON.parse(content);
+}
