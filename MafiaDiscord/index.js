@@ -105,7 +105,10 @@ const sendRandomMessage = async (channel) => {
         if(element[0]=== botPlayer.name ) botWebHookUrl = element[1];
     });
     try {
-        const result = await axios.post(botWebHookUrl, botText,{
+        const result = await axios.post(botWebHookUrl, {
+            content: botText.content,
+            username: botPlayer.name
+        },{
             headers: {
                 'Content-Type': 'application/json'
             }
