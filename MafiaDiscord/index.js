@@ -6,7 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import axios from 'axios';
 import 'colors';
-import { createSetting } from './settingPrompt.js';
+import { createSetting, GAME_MASTER_VOTING_COMMAND,GAME_MASTER_NIGHT_MAFIA_COMMAND } from './settingPrompt.js';
 
 
 dotenv.config();
@@ -318,6 +318,24 @@ class Player {
         return prompt(conversation);
     }
 
+    vote(conversation){
+        const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
+            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality); 
+        const prompt = NPCPrompt(setting, {
+            response_format: {type:'json_object',}
+        });
+        return prompt(conversation+"\n"+GAME_MASTER_VOTING_COMMAND);
+    }
+
+    kill(conversation){
+        const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
+            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality); 
+        const prompt = NPCPrompt(setting, {
+            response_format: {type:'json_object',}
+        });
+        return prompt(conversation+"\n"+GAME_MASTER_NIGHT_MAFIA_COMMAND);
+    }
+
     getAllyRoles() {
         return this.role === MafiaRole.MAFIA ? [MafiaRole.MAFIA] : [MafiaRole.DOCTOR, MafiaRole.DETECTIVE, MafiaRole.VILLAGER];
     }
@@ -392,7 +410,7 @@ async function changeWebHookName(webhookUrl,newName){
 }
 function choosePlayer(bots, lastChosenPlayerName) {
   // Calculate the total confidence
-  const filteredPlayers= bots.filter(player=> player.name!=lastChosenPlayerName);
+  const filteredPlayers= bots.filter(player=> player.name!=lastChosenPlayerName && player.alive);
   const totalConfidence = filteredPlayers.reduce((total, player) => total + player.confidence, 0);
 
   // Generate a random number between 0 and totalConfidence
@@ -421,7 +439,7 @@ async function start() {
 }
 
 async function randomStart() {
-  while(true){
+  for(const i=0;i<5;i++){
     const player=choosePlayer(bots,lastChosenPlayerName);
     lastChosenPlayerName=player.name;
     const response = await player.speak(conversation);
@@ -430,6 +448,11 @@ async function randomStart() {
     console.log(response.content);
     conversation+=player.name+": "+response.content;
   }
+  for (const player of bots) {
+    const response = await player.vote(conversation);
+    // console.log(player.name);
+    console.log(response);
+}
 }
 
 async function botSpeak(){
@@ -447,4 +470,8 @@ function playerSpeak(username, content){
   conversation+= username+": "+content;
 }
 
+
+function toJSON(content) {
+    return JSON.parse(content);
+}
 
