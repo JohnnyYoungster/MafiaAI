@@ -22,19 +22,15 @@ const client = new Client({
     
 });
 
+let currentChannel;
 const discordBotToken = process.env.BotToken;
 
-// 플레이어와 해당 텍스트 리스트를 설정
+
 const players = [
-    { name: 'DomeLover', texts: ['Do you know Dome?', 'I Like Dome the most', 'Lets eat domme together!'], role: 'Mafia' },
-    { name: 'Nubjook', texts: ['I hate assignments!', 'I want vacation?', 'Dobby is free now'], role: 'Civil' },
-    { name: 'Hos Fan', texts: ['Heroes of the storm is goat', 'Siuuuuu!!!!', 'Hos > lol '], role: 'Civil' },
-];
-const votePaper = players.map(players =>({
-    name :players.name,
-    votes : 0
-})
-);
+   
+]
+let votePaper ={}
+
 
 
 let interval;
@@ -42,43 +38,48 @@ let isRunning = false; // 반복 작업 여부 추적
 let isVoiceAllowed = false;
 let dayTime = 1;
 let isUserTyping = false;
-
+let stateMentCount =0;
 
 // 랜덤한 플레이어와 텍스트를 채팅에 보내는 함수
-const voteMafia = async (channel, personIndex) => {
-
-    const electedPerson = players[personIndex];
-    const message = `${electedPerson.name} is selected, The people's role is ${electedPerson.role}`;
-    
-    
-    // TTS로 말하게 하기
-    await channel.send({ content: message, tts: isVoiceAllowed });
-    players.splice(personIndex, 1); // 선택된 플레이어 제거
-    dayTime =dayTime +1;
-    startRandomMessages();
-
-    
-};
-const voteMafiaBasic = (personindex) =>
+async function voteStartCondition()
+{
+    if(stateMentCount>16)
     {
-      votePaper[personindex].votes +=1;
+     await voteAction(currentChannel)
+     stateMentCount = 0;
+    }
+}
 
-   } 
-const voteMafiaBot = async (player,personindex,channel) =>
-    {
-        voteMafiaBasic(personindex);
-        await channel.send(`${player.name} vote for ${players[personindex].name}`);
-   }
-const voteMafiaHuman = async(personindex,channel) =>
-    {
-        voteMafiaBasic(personindex);
-        const electedPeronName = votePaper.reduce((prev,cur) =>{
-         return cur.votes>prev.votes ?cur :prev;
-        }).name;
-        const electedPeronIndex = players.findIndex(player => player.name === electedPeronName);
-        voteMafia(channel,electedPeronIndex);
+async function voteAction()
+{
+    stopRandomMessages();
+    for (const players of bots)voteMafiaBot(players,currentChannel);
         
- }
+    
+    const voteButtons = votePaper.map((player, index) => 
+        new ButtonBuilder()
+            .setCustomId(`vote_${index}`) // 각 플레이어에 대한 고유한 ID 설정
+            .setLabel(player.name)
+            .setStyle(ButtonStyle.Secondary)
+    );
+    if(voteButtons.length>5){
+        const row = new ActionRowBuilder().addComponents(voteButtons.slice(0,5));
+        const row2 = new ActionRowBuilder().addComponents(voteButtons.slice(5,voteButtons.length));
+        await currentChannel.send({
+            content: 'Choose a player to vote for:',
+            components: [row,row2],
+            ephemeral: true, // 이 옵션을 통해 특정 사용자에게만 보이는 메시지로 설정할 수 있습니다
+        });
+    }
+    else{
+        const row = new ActionRowBuilder().addComponents(voteButtons); // 버튼들을 하나의 행으로 그룹화
+        await currentChannel.send({
+            content: 'Choose a player to vote for:',
+            components: [row],
+            ephemeral: true, // 이 옵션을 통해 특정 사용자에게만 보이는 메시지로 설정할 수 있습니다
+        });
+    }
+}
 const webHookUrls =
 [
  process.env.player1_WebHook_url,
@@ -92,7 +93,29 @@ process.env.player7_WebHook_url,
 ];
 const webHookLis =[];
 // 랜덤 메시지 전송 함수
+async function sendWebHookMessage(botName, message){
+    let hookUrl ='';
+    webHookLis.forEach(element =>{
+        if(element[0]===botName) hookUrl = element[1];
+    });
+    try
+    {
+        await axios.post(hookUrl,{
+            content: message,
+            username:botName
+        },{
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    }
+    catch (error){
+        console.error('Error sending message:', error);
+    }
+}
 const sendRandomMessage = async (channel) => {
+    voteStartCondition();   
+    stateMentCount ++;
     // if(isUserTyping) return;
     //const randomPlayer = players[Math.floor(Math.random() * players.length)];
     //const randomText = randomPlayer.texts[Math.floor(Math.random() * randomPlayer.texts.length)];
@@ -100,24 +123,25 @@ const sendRandomMessage = async (channel) => {
     const botText ={ content:botList[0]
     };
     const botPlayer = botList[1];
-    let botWebHookUrl=''
-   webHookLis.forEach(element =>{
-        if(element[0]=== botPlayer.name ) botWebHookUrl = element[1];
-    });
-    try {
-        const result = await axios.post(botWebHookUrl, {
-            content: botText.content,
-            username: botPlayer.name
-        },{
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        console.log('Message sent successfully:', result.data);
-    }
-    catch (error) {
-        console.error('Error sending message:', error);
-    }
+    await sendWebHookMessage(botPlayer.name,botText.content);
+//     let botWebHookUrl=''
+//    webHookLis.forEach(element =>{
+//         if(element[0]=== botPlayer.name ) botWebHookUrl = element[1];
+//     });
+//     try {
+//         const result = await axios.post(botWebHookUrl, {
+//             content: botText.content,
+//             username: botPlayer.name
+//         },{
+//             headers: {
+//                 'Content-Type': 'application/json'
+//             }
+//         });
+//         console.log('Message sent successfully:', result.data);
+//     }
+//     catch (error) {
+//         console.error('Error sending message:', error);
+//     }
 
 
     // TTS로 말하게 하기
@@ -157,6 +181,7 @@ client.once('ready', async () => {
 // 버튼을 포함한 메시지 전송
 client.on('messageCreate', async (message) => {
     if (message.content === '!start') {
+        currentChannel = message.channel;
         const startButton = new ButtonBuilder()
             .setCustomId('start')
             .setLabel('Start Bot')
@@ -185,6 +210,7 @@ client.on('messageCreate', async (message) => {
     }
 
     if (message.content === "!control" ) {
+        currentChannel = message.channel;
         const voteButton = new ButtonBuilder()
             .setCustomId('vote')
             .setLabel('Vote for Mafia')
@@ -222,7 +248,7 @@ client.on('messageCreate', async (message) => {
     //     isUserTyping = false;
     //     await startRandomMessages(message.channel);
     // }
-});
+});  
 
 // client.on('typingStart',async(typing)=>{
 //     if(!isRunning && isUserTyping) return;
@@ -253,26 +279,43 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply('Bot has been stopped.');
         }
     } else if (interaction.customId === 'vote') {
-        const voteButtons = players.map((player, index) => 
+        stopRandomMessages();
+        for (const players of bots)voteMafiaBot(players,interaction.channel);
+            
+        
+        const voteButtons = votePaper.map((player, index) => 
             new ButtonBuilder()
                 .setCustomId(`vote_${index}`) // 각 플레이어에 대한 고유한 ID 설정
                 .setLabel(player.name)
                 .setStyle(ButtonStyle.Secondary)
         );
-
-        const row = new ActionRowBuilder().addComponents(voteButtons); // 버튼들을 하나의 행으로 그룹화
-        await voteMafiaBot(players[0],0,interaction.channel);
-        await voteMafiaBot(players[1],0,interaction.channel);
-        await voteMafiaBot(players[2],0,interaction.channel);
+        if(voteButtons.length>5){
+            const row = new ActionRowBuilder().addComponents(voteButtons.slice(0,5));
+            const row2 = new ActionRowBuilder().addComponents(voteButtons.slice(5,voteButtons.length));
+            await interaction.reply({
+                content: 'Choose a player to vote for:',
+                components: [row,row2],
+                ephemeral: true, // 이 옵션을 통해 특정 사용자에게만 보이는 메시지로 설정할 수 있습니다
+            });
+        }
+        else{
+            const row = new ActionRowBuilder().addComponents(voteButtons); // 버튼들을 하나의 행으로 그룹화
+            await interaction.reply({
+                content: 'Choose a player to vote for:',
+                components: [row],
+                ephemeral: true, // 이 옵션을 통해 특정 사용자에게만 보이는 메시지로 설정할 수 있습니다
+            });
+        }
+       
+        }
+        // await voteMafiaBot(players[0],0,interaction.channel);
+        // await voteMafiaBot(players[1],0,interaction.channel);
+        // await voteMafiaBot(players[2],0,interaction.channel);
         
-        await interaction.reply({
-            content: 'Choose a player to vote for:',
-            components: [row],
-            ephemeral: true, // 이 옵션을 통해 특정 사용자에게만 보이는 메시지로 설정할 수 있습니다
-        });
-    } else if (interaction.customId.startsWith('vote_') && isRunning) {
-        stopRandomMessages();
-        isRunning = false;
+     
+    else if (interaction.customId.startsWith('vote_')) {
+        // stopRandomMessages();
+        // isRunning = false;
         const personIndex = parseInt(interaction.customId.split('_')[1]); // 인덱스 추출
         await voteMafiaHuman( personIndex,interaction.channel); // 투표 함수 호출
         await interaction.reply(`You voted for ${personIndex}!`); // 응답 메시지
@@ -394,10 +437,63 @@ fs.readFile('Characters.txt', 'utf8', async (err, data) => {
             webHookLis.push([bots[i].name,webHookUrls[i]]);
 
         }
+         votePaper = bots.map(bot =>({
+            name :bot.name,
+            votes : 0
+        })
+        );
+        votePaper.push({
+            name:'Player',
+            votes:0,
+        });
 
     //randomStart();
 });
 
+
+const voteMafia = async (channel, personIndex) => {
+
+    const electedPerson = bots[personIndex];
+    const message = `${electedPerson.name} is selected, The people's role is ${electedPerson.role}`;
+    
+    
+    // TTS로 말하게 하기
+    await channel.send({ content: message, tts: isVoiceAllowed });
+    bots.splice(personIndex, 1); // 선택된 플레이어 제거
+    dayTime =dayTime +1;
+    startRandomMessages();
+    
+};
+const voteMafiaBasic = (personindex) =>
+    {
+      votePaper[personindex].votes +=1;
+
+   } 
+const voteMafiaBot = async (bot,channel) =>
+    {   const response = await bot.vote(conversation);
+        const responseJson = JSON.parse(JSON.parse(JSON.stringify(response.content)));
+        
+        
+        const personName = responseJson.player_to_eliminate;
+        const reason = responseJson.reason;
+      
+        const personindex = votePaper.findIndex(player => player.name===personName);
+        console.log(personName); 
+        console.log(personindex);
+        await sendWebHookMessage(bot.name,reason);
+        voteMafiaBasic(personindex);
+        await channel.send(`${bot.name} vote for ${personName}`);
+   }
+const voteMafiaHuman = async(personindex,channel) =>
+    {
+        voteMafiaBasic(personindex);
+        const electedPersonName = votePaper.reduce((prev,cur) =>{
+         return cur.votes>prev.votes ?cur :prev;
+        }).name;
+        const electedPeronIndex = votePaper.findIndex(player => player.name === electedPersonName);
+        voteMafia(channel,electedPeronIndex);
+        
+ }
 let conversation="Game Master: The day starts and the town is notified from the government that there is a Mafia about to murder all of them. Day 1 discussion ensues. \n";
 let lastChosenPlayerName="";
 
@@ -466,6 +562,12 @@ async function botSpeak(){
     return [response.content,player];
 }
 
+async function botVoteSpeak(){
+    for(const player of bots){
+        const response = await player.vote(conversation);
+        await sendWebHookMessage(player.name,response.content);
+    }
+}
 function playerSpeak(username, content){
   conversation+= username+": "+content;
 }
