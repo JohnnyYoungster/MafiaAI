@@ -511,18 +511,19 @@ function assignRoles(arr) {
     return indexes.slice(0, numToSelect);
 }
 
-let characters = "";
+let characters = [];
 let botsWithPlayer = [];
 let bots = [];
 let votePaper = [];
+let PlayerRole=MafiaRole.VILLAGER;
 fs.readFile('Characters.txt', 'utf8', async (err, data) => {
     if (err) {
         console.error(err);
         return;
     }
     characters = data.split('\n');
-    const mafiaRoleIndexes = assignRoles(characters);
-
+    const mafiaRoleIndexes = assignRoles(characters.concat(["Player"]));
+    if(mafiaRoleIndexes.includes(7)) PlayerRole=MafiaRole.MAFIA;
     // Create players and await the extraction of personalities
     let idx = 0;
     for (const [index, line] of characters.entries()) {
@@ -596,8 +597,10 @@ function choosePlayer(bots, lastChosenPlayerName) {
 //     }
 // }
 
+const maxConvCountPerDay=2;
+
 async function randomStart(message) {
-  while(conversationCount < 2 && isRunning){
+  while(conversationCount < maxConvCountPerDay && isRunning){
 
     if(isUserTyping){
       console.log("User is typing...");
@@ -634,7 +637,7 @@ async function randomStart(message) {
     conversationCount ++;
     //await new Promise(resolve => setTimeout(resolve, 2000));
   }
-  if (conversationCount >= 2) {
+  if (conversationCount >= maxConvCountPerDay) {
     // MafiaBot이 메시지를 보냄
     console.log("vote start");
     await channel_info.send({
@@ -703,18 +706,18 @@ async function CheckEndState(scene){ // scene = 0 : voting, scene = 1 : mafia
 async function PlayerDead(scene){
   let deathMessage = "";
   if (scene == 0){
-    deathMessage = "You were dead because of villagers."
+    deathMessage = "You were killed because of the villagers."
   } else{
-    deathMessage = "You were dead because of bad Mafia."
+    deathMessage = "You were killed because of the evil Mafia."
   }
   const contButton = new ButtonBuilder()
   .setCustomId('ghostmode')
-  .setLabel('Seeing them.')
+  .setLabel('Spectating them.')
   .setStyle(ButtonStyle.Success);
 
   const endButton = new ButtonBuilder()
   .setCustomId('endmode')
-  .setLabel('End.')
+  .setLabel('End game.')
   .setStyle(ButtonStyle.Success);
 
   const dayEmbed = new EmbedBuilder()
