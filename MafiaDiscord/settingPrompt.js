@@ -89,7 +89,7 @@ export function createSetting(name, confidence_level, role, role_motivation, all
 }
 
 export const GAME_MASTER_VOTING_COMMAND = `Game master: It's time to vote! Choose one player to eliminate. 
-You must vote; you must pick somebody even if you don't see a reason. You cannot choose yourself or nobody. 
+You must vote; you must pick somebody even if you don't see a reason. You cannot choose yourself or nobody. Must Must choose alive one, not a dead person.
 Your response format: {"player_to_eliminate": "player_name", "reason": "your_reason"}
 
 Make sure your response is valid JSON. For example:
@@ -111,7 +111,8 @@ export function nightResult(killedPlayer, detectedPlayer, detectedRole, autopsyP
 
 export const GAME_MASTER_NIGHT_MAFIA_COMMAND = `
 Game Master: Choose a player you are going to eliminate from the game. You must choose somebody even if you 
-don't see a reason. You cannot choose yourself or nobody. The response needs to contain only the name of the player.`;
+don't see a reason. You cannot choose yourself or nobody. Must Must choose alive one, not a dead person. The response needs to contain only the name of the player at JSON format. Make sure your response is valid JSON. For example:
+{"player_to_kill": "John"}`;
 
 export const GAME_MASTER_NIGHT_DOCTOR_COMMAND = `
 Game Master: Choose a player you are going to protect this night. You must choose somebody even if you 
