@@ -6,7 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import axios from 'axios';
 import 'colors';
-import { createSetting, GAME_MASTER_VOTING_COMMAND,GAME_MASTER_NIGHT_MAFIA_COMMAND, votingResult, nightResult } from './settingPrompt.js';
+import { createSetting, GAME_MASTER_NIGHT_DOCTOR_COMMAND, GAME_MASTER_VOTING_COMMAND,GAME_MASTER_NIGHT_MAFIA_COMMAND, GAME_MASTER_NIGHT_DETECTIVE_COMMAND, votingResult, nightResult } from './settingPrompt.js';
 import { start } from 'repl';
 
 
@@ -41,13 +41,16 @@ let isUserTyping = false;
 let conversationCount = 0;
 let typingTimeout;  // 타이핑 타임아웃을 위한 변수
 let channel_info;
+let DoctorIndex=-1;
+let DetectiveIndex=-1;
 
 // 랜덤한 플레이어와 텍스트를 채팅에 보내는 함수
-const voteMafia = async (channel, personIndex) => {
+const voteMafia = async (channel, personIndex, saveIndex) => {
 
     const electedPerson = botsWithPlayer[personIndex];
     const message = `${electedPerson.name} was executed, and he/she was a ${electedPerson.role}`;
     
+    // const message = `${electedPerson.name} was executed.`;
     
     // TTS로 말하게 하기
     await channel.send({ content: message, tts: isVoiceAllowed });
@@ -58,7 +61,8 @@ const voteMafia = async (channel, personIndex) => {
     botsWithPlayer[personIndex].alive = false;
     if (personIndex < 7)
       bots[personIndex].alive = false;
-    conversation += votingResult(botsWithPlayer[personIndex].name);
+    conversation += votingResult(botsWithPlayer[personIndex].name,botsWithPlayer[personIndex].role);
+    // botsWithPlayer[DoctorIndex].known_players.push(botsWithPlayer[personIndex]);
     console.log("vote finished!");
     votePaper = resetVotes(votePaper);
     MafiaKillDuringNight();
@@ -79,7 +83,7 @@ const voteMafiaBot = async (bot, personindex,channel) =>
         response = await bot.vote(conversation);
         obj = toJSON(response.content);
         console.log(response.content)
-        personindex = botsWithPlayer.findIndex(bot => bot.name === obj.player_to_eliminate);
+        personindex = botsWithPlayer.findIndex(bot => bot.name.replace(/\s+/g, '').toLowerCase() === obj.player_to_eliminate.replace(/\s+/g, '').toLowerCase());
       }
 
       console.log(response.content);
@@ -440,6 +444,7 @@ const MafiaRole = {
 const role_motivations = {
     [MafiaRole.MAFIA]: 'Seeks to control the town from the shadows, operating with cunning and secrecy. Their goal is to eliminate non-Mafia players while protecting their own. They must act covertly, executing their plans under the cover of night and misleading others during the day to conceal their true identity.',
     [MafiaRole.DOCTOR]: 'Dedicated to saving lives, the Doctor works to protect those in danger from Mafia attacks. Their main goal is to identify and eliminate the Mafia threat, using their night actions to safeguard potential targets. All non-Mafia players are allies in the quest for peace.',
+    //[MafiaRole.DOCTOR]: 'The doctor performs autopsy to deduce whether the person executed the day before was a Mafia. Their main goal is to identify and eliminate the Mafia threat. All non-Mafia players are allies in the quest for peace.',
     [MafiaRole.DETECTIVE]: 'With a keen eye for deceit, the Detective investigates players to uncover their true alignments. Their mission is to use this knowledge to guide the town in rooting out the Mafia menace, employing their night actions to gather crucial intelligence.',
     [MafiaRole.VILLAGER]: 'As a regular townsperson, the Villager lacks special actions but plays a critical role in discussions and votes to eliminate the Mafia threat. Vigilance and collaboration with fellow non-Mafia players are their main weapons in the quest for safety and order.'
 };
@@ -453,18 +458,28 @@ class Player {
         this.personality = personality;
         this.confidence = confidence;
         this.user = false;
+        this.known_players = [];
     }
 
     speak(conversation) {
         const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
             this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality);
         const prompt = NPCPrompt(setting);
-        return prompt(conversation);
+        let additionalDialogue="";
+        if(this.role==MafiaRole.DETECTIVE){
+            additionalDialogue=`\nGame Master: As a detective, you should probably reveal your role on the second day or the third day (or as soon as you know who the mafia is). You should also immediately share the roles you have identified with the others. 
+            If you have already revealed your role and stated the roles you've figured out, you don't have to do it again. In this case, just participate in the discussion.`
+        }
+        else if(this.role==MafiaRole.Mafia){
+            additionalDialogue="\nGame Master: As a Mafia, if the real doctor or detective comes out with their role, you must either say that you are the actual doctor or detective instead, or say they're lying."
+        }
+        return prompt(conversation+additionalDialogue);
     }
 
     vote(conversation){
         const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
-            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality); 
+            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality
+        , this.getKnownRoles(), this.getDeadPlayers() ); 
         const prompt = NPCPrompt(setting, {
             response_format: {type:'json_object',}
         });
@@ -473,11 +488,28 @@ class Player {
 
     kill(conversation){
         const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
-            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality); 
+            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality
+        , this.getKnownRoles(), this.getDeadPlayers()); 
         const prompt = NPCPrompt(setting, {
             response_format: {type:'json_object',}
         });
         return prompt(conversation+"\n"+GAME_MASTER_NIGHT_MAFIA_COMMAND);
+    }
+
+    detect(conversation){
+        const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
+            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality
+        , this.getKnownRoles(), this.getDeadPlayers()); 
+        const prompt = NPCPrompt(setting);
+        return prompt(conversation+"\n"+GAME_MASTER_NIGHT_DETECTIVE_COMMAND);
+    }
+
+    save(conversation){
+        const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
+            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality
+        , this.getKnownRoles(), this.getDeadPlayers()); 
+        const prompt = NPCPrompt(setting);
+        return prompt(conversation+"\n"+GAME_MASTER_NIGHT_DOCTOR_COMMAND);
     }
 
     getAllyRoles() {
@@ -499,10 +531,27 @@ class Player {
                                      .map(player => player.name);
         return otherPlayers.join(', ');
     }
+
+    getKnownRoles(){
+        const accumulatedString = this.known_players
+            .map(player => `${player.name} is a ${player.role}.`)
+            .join(' ');
+        return accumulatedString;
+    }
+
+    getDeadPlayers(){
+        const deadPlayers=botsWithPlayer.filter(player=>player.alive==false);
+        if(deadPlayers==null) return '';
+        const accumulatedString = deadPlayers
+            .map(player => `${player.name} was a ${player.role}.`)
+            .join(' ');
+        return accumulatedString;
+    }
+
 }
 
 function assignRoles(arr) {
-    const numToSelect = Math.floor(arr.length / 4);
+    const numToSelect = Math.floor(arr.length / 4)+2;
     const indexes = Array.from(Array(arr.length).keys());
     for (let i = indexes.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -522,8 +571,14 @@ fs.readFile('Characters.txt', 'utf8', async (err, data) => {
         return;
     }
     characters = data.split('\n');
-    const mafiaRoleIndexes = assignRoles(characters.concat(["Player"]));
+    const MafiaNum=Math.floor((characters.length+1) / 4);
+    const roles=assignRoles(characters.concat(["Player"]));
+    const mafiaRoleIndexes = roles.slice(0,MafiaNum);
+    DetectiveIndex=roles[MafiaNum];
+    DoctorIndex=roles[MafiaNum+1];
     if(mafiaRoleIndexes.includes(7)) PlayerRole=MafiaRole.MAFIA;
+    if(DetectiveIndex==7) PlayerRole=MafiaRole.DETECTIVE;
+    if(DoctorIndex==7) PlayerRole=MafiaRole.DOCTOR;
     // Create players and await the extraction of personalities
     let idx = 0;
     for (const [index, line] of characters.entries()) {
@@ -535,6 +590,8 @@ fs.readFile('Characters.txt', 'utf8', async (err, data) => {
 
         let role = MafiaRole.VILLAGER;
         if (mafiaRoleIndexes.includes(index)) role = MafiaRole.MAFIA;
+        else if (DetectiveIndex==index) role = MafiaRole.DETECTIVE;
+        else if (DoctorIndex==index) role = MafiaRole.DOCTOR;
         bots.push(new Player(idx, data[0], role, data[1], confidence));
         botsWithPlayer.push(new Player(idx, data[0], role, data[1], confidence));
         idx += 1;
@@ -597,7 +654,7 @@ function choosePlayer(bots, lastChosenPlayerName) {
 //     }
 // }
 
-const maxConvCountPerDay=2;
+const maxConvCountPerDay=10;
 
 async function randomStart(message) {
   while(conversationCount < maxConvCountPerDay && isRunning){
@@ -691,7 +748,7 @@ async function CheckEndState(scene){ // scene = 0 : voting, scene = 1 : mafia
     VillagerWin();
     endState = true;
   }
-  if ((mafiaBots.length * 0.5 >= aliveBots.length) || (aliveBots.length == 1 && mafiaBots.length == 1)){
+  if ((mafiaBots.length  >= aliveBots.length * 0.5) || (aliveBots.length == 1 && mafiaBots.length == 1)){
     MafiaWin();
     endState = true;
   }
@@ -779,25 +836,48 @@ async function MafiaKillDuringNight(){
         const response = await mafiaBots[i].kill(conversation);
         console.log(response.content);
         let obj = toJSON(response.content);
-        killIndex = botsWithPlayer.findIndex(bot => bot.name === obj.player_to_kill);
+        killIndex = botsWithPlayer.findIndex(bot => bot.name.replace(/\s+/g, '').toLowerCase() === obj.player_to_kill.replace(/\s+/g, '').toLowerCase());
       }
 
       votePaper[killIndex].votes += 1;      
     }
+    // console.log("DEtective"+DetectiveIndex);
+    if(DetectiveIndex<bots.length) {
+        const detectiveResponse = await bots[DetectiveIndex].detect(conversation);
+        const deducedIndex = botsWithPlayer.findIndex(bot => bot.name.replace(/\s+/g, '').toLowerCase() ===detectiveResponse.content.replace(/\s+/g, '').toLowerCase());
+        bots[DetectiveIndex].known_players.push(botsWithPlayer[deducedIndex]);
+        // console.log("detected: "+detectiveResponse);
+        // console.log("current list: "+bots[DetectiveIndex].known_players);
+    }
+    let saveIndex=-1;
+
+    // console.log("Doctor"+DoctorIndex);
+    if(DoctorIndex<bots.length) {
+        const doctorResponse = await bots[DoctorIndex].save(conversation);
+        if(bots[DoctorIndex].alive) saveIndex = botsWithPlayer.findIndex(bot => bot.name.replace(/\s+/g, '').toLowerCase() ===doctorResponse.content.replace(/\s+/g, '').toLowerCase());
+        // console.log("save: "+doctorResponse);
+    }
+    
     const killededPersonName = votePaper.reduce((prev,cur) =>{
       return cur.votes>prev.votes ?cur :prev;
      }).name;
     console.log( `to be killed: ${killededPersonName}`);
     const killedPersonIndex = botsWithPlayer.findIndex(bot => bot.name === killededPersonName);
     const killedPerson = botsWithPlayer[killedPersonIndex];
-    //const message = `${electedPerson.name} was executed, and he/she was a ${electedPerson.role}`;
-    if(killedPersonIndex < 7){
-      bots[killedPersonIndex].alive = false;
+    // const message = `${electedPerson.name} was executed, and he/she was a ${electedPerson.role}`;
+    if(saveIndex!=killedPersonIndex){
+        if(killedPersonIndex < 7){
+        bots[killedPersonIndex].alive = false;
+        }
+        killedPerson.alive = false;
+        votePaper = resetVotes(votePaper);
+        return NotifyNextDay(killedPersonIndex);
     }
-    killedPerson.alive = false;
+    else{
+        votePaper = resetVotes(votePaper);
+        return NotifyNextDay(-1);
+    }
 
-    votePaper = resetVotes(votePaper);
-    return NotifyNextDay(killedPersonIndex);
   }
 }
 
@@ -808,24 +888,46 @@ async function NotifyNextDay(victimIdx){
     return;
   }
   else{
-    console.log("Night Passed!");
-    const startButton = new ButtonBuilder()
-      .setCustomId('continue')
-      .setLabel('I got it.')
-      .setStyle(ButtonStyle.Success);
-    const dayEmbed = new EmbedBuilder()
-      .setColor(0x0099ff) // 임베드 색상 설정
-      .setTitle(`Day${dayTime}`)
-      .setDescription(`The night has passed. **${botsWithPlayer[victimIdx].name}** was murdered during the night. The Mafia still exists. Discuss who the Mafia is.` )  // Day 1 설명 추가
-      .setTimestamp(); 
+    if(victimIdx!=-1){
+        console.log("Night Passed!");
+        const startButton = new ButtonBuilder()
+        .setCustomId('continue')
+        .setLabel('I got it.')
+        .setStyle(ButtonStyle.Success);
+        const dayEmbed = new EmbedBuilder()
+        .setColor(0x0099ff) // 임베드 색상 설정
+        .setTitle(`Day${dayTime}`)
+        .setDescription(`The night has passed. **${botsWithPlayer[victimIdx].name}**, who was a **${botsWithPlayer[victimIdx].role}**, was murdered during the night. The Mafia still exists. Discuss who the Mafia is.` )  // Day 1 설명 추가
+        .setTimestamp(); 
 
-    const row = new ActionRowBuilder().addComponents(startButton);
-    await channel_info.send({
-      embeds: [dayEmbed],
-      components: [row],
-    });
-    conversation += nightResult(botsWithPlayer[victimIdx].name, null, null, null, null);
-    await new Promise(resolve => setTimeout(resolve, 5000));
+        const row = new ActionRowBuilder().addComponents(startButton);
+        await channel_info.send({
+        embeds: [dayEmbed],
+        components: [row],
+        });
+        conversation += nightResult(botsWithPlayer[victimIdx].name);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+    else{
+        console.log("Night Passed!");
+        const startButton = new ButtonBuilder()
+        .setCustomId('continue')
+        .setLabel('I got it.')
+        .setStyle(ButtonStyle.Success);
+        const dayEmbed = new EmbedBuilder()
+        .setColor(0x0099ff) // 임베드 색상 설정
+        .setTitle(`Day${dayTime}`)
+        .setDescription(`The night has passed. Nobody was killed as the doctor protected the victim from the Mafia. The Mafia still exists. Discuss who the Mafia is.` )  // Day 1 설명 추가
+        .setTimestamp(); 
+
+        const row = new ActionRowBuilder().addComponents(startButton);
+        await channel_info.send({
+        embeds: [dayEmbed],
+        components: [row],
+        });
+        conversation += nightResult(null);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+    }
   }
 
 }
