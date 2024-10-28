@@ -318,7 +318,7 @@ client.on('messageCreate', async (message) => {
     else if (message.content === ('!resume')) {
       console.log(`User issued !resume command, restarting conversation...`);
       isUserTyping = false;  // 대화를 중단
-      randomStart(conversationCount);  // 5초 후에 대화 재개
+      //randomStart(conversationCount);  // 5초 후에 대화 재개
     }
     else if (isUserTyping){
       console.log(`${message.author.username}: ${message.content}`);
@@ -332,7 +332,7 @@ client.on('messageCreate', async (message) => {
       if (typingTimeout) clearTimeout(typingTimeout);
       typingTimeout = setTimeout(() => {
         //console.log("No typing detected for 5 seconds, resuming conversation...");
-        randomStart(conversationCount);  // 5초 후에 대화 재개
+        //randomStart(conversationCount);  // 5초 후에 대화 재개
       }, 5000);  // 5초 후에 대화 재개
     }
   }
