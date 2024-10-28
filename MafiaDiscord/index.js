@@ -321,10 +321,10 @@ client.on('messageCreate', async (message) => {
       //randomStart(conversationCount);  // 5초 후에 대화 재개
     }
     else if (isUserTyping){
-      console.log(`${message.author.username}: ${message.content}`);
+      console.log(`${userName}: ${message.content}`);
 
       // 사용자의 메시지를 대화에 추가
-      conversation += `${message.author.username}: ${message.content}\n`;
+      conversation += `${userName}: ${message.content}\n`;
   
       isUserTyping = false;  // 타이핑 상태 해제
   
@@ -693,6 +693,7 @@ async function randomStart(message) {
     }
     conversationCount ++;
     //await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 5000));
   }
   if (conversationCount >= maxConvCountPerDay) {
     // MafiaBot이 메시지를 보냄
