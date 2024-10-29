@@ -43,6 +43,14 @@ let typingTimeout;  // 타이핑 타임아웃을 위한 변수
 let channel_info;
 let DoctorIndex=-1;
 let DetectiveIndex=-1;
+let UserKill;
+let UserDetect;
+let UserHeal;
+let wait = true;
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // 랜덤한 플레이어와 텍스트를 채팅에 보내는 함수
 const voteMafia = async (channel, personIndex, saveIndex) => {
@@ -216,7 +224,7 @@ client.on('messageCreate', async (message) => {
     else if (message.content === '!play') {
       
       channel_info = message.channel;
-      botsWithPlayer.push(new Player(7, userName, MafiaRole.VILLAGER, 'User', 100));
+      botsWithPlayer.push(new Player(7, userName, PlayerRole, 'User', 100));
       botsWithPlayer[7].user = true;
       votePaper.push({
         name : userName,
@@ -232,7 +240,7 @@ client.on('messageCreate', async (message) => {
             const dayEmbed = new EmbedBuilder()
             .setColor(0x0099ff) // 임베드 색상 설정
             .setTitle(`Day${dayTime}`)
-            .setDescription(`The game has started. You can say after typing **!say**. Now is Day ${dayTime}` )  // Day 1 설명 추가
+            .setDescription(`The game has started. You can say after typing **!say**. Now is Day ${dayTime}. Your role is ${PlayerRole}!` )  // Day 1 설명 추가
             .setTimestamp(); 
 
         // const stopButton = new ButtonBuilder()
@@ -248,6 +256,25 @@ client.on('messageCreate', async (message) => {
                 embeds: [dayEmbed],  // 임베드 메시지
                 components: [row],   // 버튼
             });
+        if (PlayerRole === MafiaRole.MAFIA) {
+            const mafiaPlayers = botsWithPlayer
+                .filter(player => player.role === MafiaRole.MAFIA && player.alive && player.name !== userName)
+                .map(player => player.name); // MAFIA 역할의 플레이어 이름 목록
+        
+            const mafiaEmbed = new EmbedBuilder()
+                .setColor(0xff0000)
+                .setTitle(`You are MAFIA`)
+                .setDescription(
+                    mafiaPlayers.length > 0
+                        ? `Your fellow Mafia members are: ${mafiaPlayers.join(', ')}`
+                        : `You are the only Mafia member remaining.`
+                )
+                .setTimestamp();
+        
+            await message.channel.send({
+                embeds: [mafiaEmbed], // Mafia 멤버 리스트를 담은 임베드 메시지
+            });
+        }
     }
 
     if (message.content === "!control" ) {
@@ -425,6 +452,30 @@ client.on('interactionCreate', async (interaction) => {
         const personIndex = parseInt(interaction.customId.split('_')[1]); // 인덱스 추출
         await voteMafiaHuman( personIndex,interaction.channel); // 투표 함수 호출
         await interaction.reply(`You voted for ${bots[personIndex].name}!`); // 응답 메시지
+    } else if (interaction.customId.startsWith('kill_')) {
+        stopRandomMessages();
+        isRunning = false;
+        const personIndex = parseInt(interaction.customId.split('_')[1]);
+        UserKill = personIndex;
+        console.log(personIndex)
+        await interaction.reply(`You choosed ${bots[personIndex].name} to kill!`);
+        wait = false;
+    } else if (interaction.customId.startsWith('detect_')) {
+        stopRandomMessages();
+        isRunning = false;
+        const personIndex = parseInt(interaction.customId.split('_')[1]);
+        UserDetect = personIndex;
+        console.log(personIndex)
+        await interaction.reply(`You choosed ${bots[personIndex].name} to detect! The role of ${bots[personIndex].name} is ${bots[personIndex].role}`);
+        wait = false;
+    } else if (interaction.customId.startsWith('heal_')) {
+        stopRandomMessages();
+        isRunning = false;
+        const personIndex = parseInt(interaction.customId.split('_')[1]);
+        UserHeal = personIndex;
+        console.log(personIndex)
+        await interaction.reply(`You choosed ${bots[personIndex].name} to heal!`);
+        wait = false;
     }
     else if (interaction.customId.startsWith('voice'))
         {
@@ -654,7 +705,7 @@ function choosePlayer(bots, lastChosenPlayerName) {
 //     }
 // }
 
-const maxConvCountPerDay=10;
+const maxConvCountPerDay=1;
 
 async function randomStart(message) {
   while(conversationCount < maxConvCountPerDay && isRunning){
@@ -823,27 +874,82 @@ async function MafiaKillDuringNight(){
     console.log("But already mafia won!");
   }
   else{
-    console.log("They selected someone to kill...!");
+    console.log("They selected someone to kill...");
     let aliveBots = botsWithPlayer.filter(bot => bot.alive);
     let mafiaBots = botsWithPlayer.filter(bot => bot.alive && bot.role === MafiaRole.MAFIA);
-    let killIndex = 0;
-    for(let i = 0 ; i < mafiaBots.length; i++){
-      const response = await mafiaBots[i].kill(conversation);
-      console.log(response.content);
-      let obj = toJSON(response.content);
-      killIndex = botsWithPlayer.findIndex(bot => bot.name === obj.player_to_kill);
 
-      while (killIndex < 0 || !botsWithPlayer[killIndex].alive){
-        const response = await mafiaBots[i].kill(conversation);
-        console.log(response.content);
-        let obj = toJSON(response.content);
-        killIndex = botsWithPlayer.findIndex(bot => bot.name.replace(/\s+/g, '').toLowerCase() === obj.player_to_kill.replace(/\s+/g, '').toLowerCase());
-      }
+    // 플레이어가 마피아일 경우 직접 선택하도록 처리
+    const playerMafia = mafiaBots.find(bot => bot.user);
+    if (playerMafia) {
+        // 플레이어에게 선택을 요청하는 메시지 전송
+        const targets = aliveBots.filter(bot => bot.alive && bot.role !== MafiaRole.MAFIA) // 본인은 제외
 
-      votePaper[killIndex].votes += 1;      
+        const targetbuttons = targets.map((player, index) =>
+            new ButtonBuilder()
+                .setCustomId(`kill_${player.idx}`) // 각 플레이어에 대한 고유한 ID 설정
+                .setLabel(player.name)
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+        const row = new ActionRowBuilder().addComponents(targetbuttons.slice(0,targetbuttons.length/2)); // 버튼들을 하나의 행으로 그룹화
+        const row_2 = new ActionRowBuilder().addComponents(targetbuttons.slice(targetbuttons.length/2,targetbuttons.length)); // 버튼들을 하나의 행으로 그룹화 
+        
+        await channel_info.send({
+            content: 'Choose a player to kill',
+            components: [row, row_2],
+            ephemeral: true,
+        });
+        wait = true;
+        while(wait){await sleep(500);}
+        let killIndex = UserKill;
+        votePaper[killIndex].votes += 1;
+    } else {
+        // 봇 마피아는 자동으로 대상 선택
+        for (let i = 0; i < mafiaBots.length; i++) {
+            const response = await mafiaBots[i].kill(conversation);
+            console.log(response.content);
+            let obj = toJSON(response.content);
+            let killIndex = botsWithPlayer.findIndex(bot => bot.name === obj.player_to_kill);
+
+            // 대상이 없거나 이미 죽은 경우 반복하여 선택
+            while (killIndex < 0 || !botsWithPlayer[killIndex].alive) {
+                const response = await mafiaBots[i].kill(conversation);
+                console.log(response.content);
+                obj = toJSON(response.content);
+                killIndex = botsWithPlayer.findIndex(bot => bot.name.replace(/\s+/g, '').toLowerCase() === obj.player_to_kill.replace(/\s+/g, '').toLowerCase());
+            }
+
+            votePaper[killIndex].votes += 1;
+        }
     }
     // console.log("DEtective"+DetectiveIndex);
-    if(DetectiveIndex<bots.length) {
+    let detectiveBots = botsWithPlayer.filter(bot => bot.alive && bot.role === MafiaRole.DETECTIVE);
+
+    // 플레이어가 마피아일 경우 직접 선택하도록 처리
+    const playerDetective = detectiveBots.find(bot => bot.user);
+    if (playerDetective) {
+        // 플레이어가 탐정일 경우에만 조사할 대상 버튼을 제공
+        // 플레이어에게 선택을 요청하는 메시지 전송
+        const targets = aliveBots.filter(bot => bot.alive) // 본인은 제외
+
+        const targetbuttons = targets.map((player, index) =>
+            new ButtonBuilder()
+                .setCustomId(`detect_${player.idx}`) // 각 플레이어에 대한 고유한 ID 설정
+                .setLabel(player.name)
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+        const row = new ActionRowBuilder().addComponents(targetbuttons.slice(0,targetbuttons.length/2)); // 버튼들을 하나의 행으로 그룹화
+        const row_2 = new ActionRowBuilder().addComponents(targetbuttons.slice(targetbuttons.length/2,targetbuttons.length)); // 버튼들을 하나의 행으로 그룹화 
+        
+        await channel_info.send({
+            content: 'Choose a player to detect',
+            components: [row, row_2],
+            ephemeral: true,
+        });
+        wait = true;
+        while(wait){await sleep(500);}
+    } else if(DetectiveIndex<bots.length) {
         const detectiveResponse = await bots[DetectiveIndex].detect(conversation);
         const deducedIndex = botsWithPlayer.findIndex(bot => bot.name.replace(/\s+/g, '').toLowerCase() ===detectiveResponse.content.replace(/\s+/g, '').toLowerCase());
         bots[DetectiveIndex].known_players.push(botsWithPlayer[deducedIndex]);
@@ -853,7 +959,35 @@ async function MafiaKillDuringNight(){
     let saveIndex=-1;
 
     // console.log("Doctor"+DoctorIndex);
-    if(DoctorIndex<bots.length) {
+
+    let doctorBots = botsWithPlayer.filter(bot => bot.alive && bot.role === MafiaRole.DOCTOR);
+
+    // 플레이어가 마피아일 경우 직접 선택하도록 처리
+    const playerDoctor = doctorBots.find(bot => bot.user);
+    if (playerDoctor) {
+        // 플레이어가 의사일 경우에만 치료할 대상 버튼을 제공
+        // 플레이어에게 선택을 요청하는 메시지 전송
+        const targets = aliveBots.filter(bot => bot.alive) // 본인은 제외
+
+        const targetbuttons = targets.map((player, index) =>
+            new ButtonBuilder()
+                .setCustomId(`heal_${player.idx}`) // 각 플레이어에 대한 고유한 ID 설정
+                .setLabel(player.name)
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+        const row = new ActionRowBuilder().addComponents(targetbuttons.slice(0,targetbuttons.length/2)); // 버튼들을 하나의 행으로 그룹화
+        const row_2 = new ActionRowBuilder().addComponents(targetbuttons.slice(targetbuttons.length/2,targetbuttons.length)); // 버튼들을 하나의 행으로 그룹화 
+        
+        await channel_info.send({
+            content: 'Choose a player to detect',
+            components: [row, row_2],
+            ephemeral: true,
+        });
+        wait = true;
+        while(wait){await sleep(500);}
+        saveIndex = UserHeal;
+    } else if(DoctorIndex<bots.length) {
         const doctorResponse = await bots[DoctorIndex].save(conversation);
         if(bots[DoctorIndex].alive) saveIndex = botsWithPlayer.findIndex(bot => bot.name.replace(/\s+/g, '').toLowerCase() ===doctorResponse.content.replace(/\s+/g, '').toLowerCase());
         // console.log("save: "+doctorResponse);
