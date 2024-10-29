@@ -705,7 +705,7 @@ function choosePlayer(bots, lastChosenPlayerName) {
 //     }
 // }
 
-const maxConvCountPerDay=1;
+const maxConvCountPerDay=10;
 
 async function randomStart(message) {
   while(conversationCount < maxConvCountPerDay && isRunning){
