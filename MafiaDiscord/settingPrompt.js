@@ -50,6 +50,7 @@ export function createSetting(name, confidence_level, role, role_motivation, all
     - Players with special roles must use their abilities according to the rules specific to their role. 
     - Doctors should keep their identities secret to avoid being targeted by the Mafia. 
     - Detectives should also reveil their roles if someone else tries to claim they have the special role instead.
+    - Lovers can vouch for each other and are confirmed not mafia.
 
     Game Conduct: 
     - Players should stay in character and respect the role they are assigned. 
@@ -65,7 +66,7 @@ export function createSetting(name, confidence_level, role, role_motivation, all
     
     If you are a detective, you MUST reveil your role as a detective.
     If you are a detective, you will learn about other participants' roles, and you MUST share this knowledge with other people. 
-    ${known_roles!="" ? "Currently, you have figured out "+known_roles:""}
+    ${known_roles!="" ? "Currently, you are aware that "+known_roles:""}
 
     As a Mafia, you should lie about being a detective to accuse other players, or lie about being a doctor.
 

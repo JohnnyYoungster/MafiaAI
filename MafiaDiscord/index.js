@@ -225,6 +225,7 @@ client.on('messageCreate', async (message) => {
       
       channel_info = message.channel;
       botsWithPlayer.push(new Player(7, userName, PlayerRole, 'User', 100));
+
       botsWithPlayer[7].user = true;
       votePaper.push({
         name : userName,
@@ -274,6 +275,22 @@ client.on('messageCreate', async (message) => {
             await message.channel.send({
                 embeds: [mafiaEmbed], // Mafia 멤버 리스트를 담은 임베드 메시지
             });
+        }
+        if (PlayerRole=== MafiaRole.LOVERS) {
+            const loverPlayers = botsWithPlayer
+            .filter(player => player.role === MafiaRole.LOVERS && player.alive && player.name !== userName)
+            .map(player => player.name); // MAFIA 역할의 플레이어 이름 목록
+    
+        const loverEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle(`You are Lovers`)
+            .setDescription(`Your partner lover is: ${loverPlayers.join(', ')}`
+            )
+            .setTimestamp();
+    
+        await message.channel.send({
+            embeds: [loverEmbed], // Mafia 멤버 리스트를 담은 임베드 메시지
+        });
         }
     }
 
@@ -489,7 +506,8 @@ const MafiaRole = {
     MAFIA: 'Mafia',
     DOCTOR: 'Doctor',
     DETECTIVE: 'Detective',
-    VILLAGER: 'Villager'
+    VILLAGER: 'Villager',
+    LOVERS: 'Lovers'
 };
 
 const role_motivations = {
@@ -497,7 +515,8 @@ const role_motivations = {
     [MafiaRole.DOCTOR]: 'Dedicated to saving lives, the Doctor works to protect those in danger from Mafia attacks. Their main goal is to identify and eliminate the Mafia threat, using their night actions to safeguard potential targets. All non-Mafia players are allies in the quest for peace.',
     //[MafiaRole.DOCTOR]: 'The doctor performs autopsy to deduce whether the person executed the day before was a Mafia. Their main goal is to identify and eliminate the Mafia threat. All non-Mafia players are allies in the quest for peace.',
     [MafiaRole.DETECTIVE]: 'With a keen eye for deceit, the Detective investigates players to uncover their true alignments. Their mission is to use this knowledge to guide the town in rooting out the Mafia menace, employing their night actions to gather crucial intelligence.',
-    [MafiaRole.VILLAGER]: 'As a regular townsperson, the Villager lacks special actions but plays a critical role in discussions and votes to eliminate the Mafia threat. Vigilance and collaboration with fellow non-Mafia players are their main weapons in the quest for safety and order.'
+    [MafiaRole.VILLAGER]: 'As a regular townsperson, the Villager lacks special actions but plays a critical role in discussions and votes to eliminate the Mafia threat. Vigilance and collaboration with fellow non-Mafia players are their main weapons in the quest for safety and order.',
+    [MafiaRole.LOVERS]: 'As the partner of another member of the town, you should immediately reveal your role as soon as possible and vouch for your lover. You realize that both you and your lover is confirmed not Mafia, and you will let the other townspeople know this fact.' 
 };
 
 class Player {
@@ -516,25 +535,38 @@ class Player {
         const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
             this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality);
         const prompt = NPCPrompt(setting);
-        let additionalDialogue="";
+        let additionalDialogue=`\nGame Master: Now you must reply with a plain text without any formatting. Don't use new lines, lists, or any other formatting. 
+        Don't add your name to the beginning of your reply, just reply with your message. Remember, your personality is the following: `+this.personality;
         if(this.role==MafiaRole.DETECTIVE){
-            additionalDialogue=`\nGame Master: As a detective, you should probably reveal your role on the second day or the third day (or as soon as you know who the mafia is). You should also immediately share the roles you have identified with the others. 
-            If you have already revealed your role and stated the roles you've figured out, you don't have to do it again. In this case, just participate in the discussion.`
+            console.log(this.getKnownRoles());
+            additionalDialogue+=`As a detective, you should probably reveal your role on the second day or the third day (or as soon as you know who the mafia is). You should also immediately share the roles you have identified with the others. 
+            If you have already revealed your role and stated the roles you've figured out, you don't have to do it again. In this case, just participate in the discussion. For reference, you've figured out the following: `+this.getKnownRoles();
         }
-        else if(this.role==MafiaRole.Mafia){
-            additionalDialogue="\nGame Master: As a Mafia, if the real doctor or detective comes out with their role, you must either say that you are the actual doctor or detective instead, or say they're lying."
+        else if(this.role==MafiaRole.MAFIA){
+            additionalDialogue+="As a Mafia, if the real detective comes out with their role, you might say that you are the detective instead, or say they're lying."
+        }
+        else if(this.role==MafiaRole.LOVERS){
+            additionalDialogue+="Also, remember to vouch and protect your partner if they're alive: "+botsWithPlayer.filter(player => player.name !== this.name && player.alive==true && player.role==MafiaRole.LOVERS)
+            .map(player => player.name)[0];
         }
         return prompt(conversation+additionalDialogue);
     }
 
     vote(conversation){
         const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
-            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality
+            this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town full of wacky people.", this.personality
         , this.getKnownRoles(), this.getDeadPlayers() ); 
         const prompt = NPCPrompt(setting, {
             response_format: {type:'json_object',}
         });
-        return prompt(conversation+"\n"+GAME_MASTER_VOTING_COMMAND);
+        let additionalDialogue="";
+        if(this.role!=MafiaRole.MAFIA){
+            additionalDialogue+='When voting, focus more on the actions of other players than the mannerisms of how they speak. Focus on the people inspected by the detective (be they real or not), and do not vote on those confirmed innocent like the lovers. Just because they speak in a funny way does not make them suspicious.';
+        }
+        else if(this.role==MafiaRole.MAFIA){
+            additionalDialogue+="As a Mafia, you might want to target those who are a threat to the Mafia, such as those posing as the detective."
+        }
+        return prompt(conversation+"\n"+GAME_MASTER_VOTING_COMMAND+ additionalDialogue+' Remember, your personality is the following: '+this.personality);
     }
 
     kill(conversation){
@@ -564,11 +596,11 @@ class Player {
     }
 
     getAllyRoles() {
-        return this.role === MafiaRole.MAFIA ? [MafiaRole.MAFIA] : [MafiaRole.DOCTOR, MafiaRole.DETECTIVE, MafiaRole.VILLAGER];
+        return this.role === MafiaRole.MAFIA ? [MafiaRole.MAFIA] : [MafiaRole.DOCTOR, MafiaRole.DETECTIVE, MafiaRole.VILLAGER, MafiaRole.LOVERS];
     }
 
     getEnemyRoles() {
-        return this.role === MafiaRole.MAFIA ? [MafiaRole.DOCTOR, MafiaRole.DETECTIVE, MafiaRole.VILLAGER] : [MafiaRole.MAFIA];
+        return this.role === MafiaRole.MAFIA ? [MafiaRole.DOCTOR, MafiaRole.DETECTIVE, MafiaRole.VILLAGER, MafiaRole.LOVERS] : [MafiaRole.MAFIA];
     }
 
     getKnownAllies() {
@@ -602,7 +634,7 @@ class Player {
 }
 
 function assignRoles(arr) {
-    const numToSelect = Math.floor(arr.length / 4)+2;
+    const numToSelect = Math.floor(arr.length / 4)+4;
     const indexes = Array.from(Array(arr.length).keys());
     for (let i = indexes.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -627,9 +659,12 @@ fs.readFile('Characters.txt', 'utf8', async (err, data) => {
     const mafiaRoleIndexes = roles.slice(0,MafiaNum);
     DetectiveIndex=roles[MafiaNum];
     DoctorIndex=roles[MafiaNum+1];
+    const LoverIndex1=roles[MafiaNum+2];
+    const LoverIndex2=roles[MafiaNum+3];
     if(mafiaRoleIndexes.includes(7)) PlayerRole=MafiaRole.MAFIA;
     if(DetectiveIndex==7) PlayerRole=MafiaRole.DETECTIVE;
     if(DoctorIndex==7) PlayerRole=MafiaRole.DOCTOR;
+    if(LoverIndex1==7 || LoverIndex2==7) PlayerRole=MafiaRole.LOVERS;
     // Create players and await the extraction of personalities
     let idx = 0;
     for (const [index, line] of characters.entries()) {
@@ -643,6 +678,9 @@ fs.readFile('Characters.txt', 'utf8', async (err, data) => {
         if (mafiaRoleIndexes.includes(index)) role = MafiaRole.MAFIA;
         else if (DetectiveIndex==index) role = MafiaRole.DETECTIVE;
         else if (DoctorIndex==index) role = MafiaRole.DOCTOR;
+        else if (LoverIndex1==index || LoverIndex2==index) {
+            role=MafiaRole.LOVERS
+        }
         bots.push(new Player(idx, data[0], role, data[1], confidence));
         botsWithPlayer.push(new Player(idx, data[0], role, data[1], confidence));
         idx += 1;

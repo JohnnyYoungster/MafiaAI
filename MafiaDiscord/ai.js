@@ -21,7 +21,7 @@ export function basicPrompt(userPrompt, options = {}, context = []) {
             Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         },
         data: {
-            model: 'gpt-4o-mini',
+            model: 'gpt-4o',
             temperature: 0,
             ...options,
             messages,
@@ -51,7 +51,7 @@ export function getPrompt(thread = []) {
                 Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
             },
             data: {
-                model: 'gpt-4o-mini',
+                model: 'gpt-4o',
                 max_tokens: 500,
                 temperature: 0,
                 ...options,
@@ -85,7 +85,7 @@ export function NPCPrompt(setting) {
                 Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
             },
             data: {
-                model: 'gpt-4o-mini',
+                model: 'gpt-4o',
                 max_tokens: 500,
                 temperature: 0,
                 ...options,
