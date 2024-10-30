@@ -458,7 +458,7 @@ client.on('interactionCreate', async (interaction) => {
         const personIndex = parseInt(interaction.customId.split('_')[1]);
         UserKill = personIndex;
         console.log(personIndex)
-        await interaction.reply(`You choosed ${bots[personIndex].name} to kill!`);
+        await interaction.reply(`You chose ${bots[personIndex].name} to kill!`);
         wait = false;
     } else if (interaction.customId.startsWith('detect_')) {
         stopRandomMessages();
@@ -466,7 +466,7 @@ client.on('interactionCreate', async (interaction) => {
         const personIndex = parseInt(interaction.customId.split('_')[1]);
         UserDetect = personIndex;
         console.log(personIndex)
-        await interaction.reply(`You choosed ${bots[personIndex].name} to detect! The role of ${bots[personIndex].name} is ${bots[personIndex].role}`);
+        await interaction.reply(`You chose ${bots[personIndex].name} to detect! The role of ${bots[personIndex].name} is ${bots[personIndex].role}`);
         wait = false;
     } else if (interaction.customId.startsWith('heal_')) {
         stopRandomMessages();
@@ -474,7 +474,7 @@ client.on('interactionCreate', async (interaction) => {
         const personIndex = parseInt(interaction.customId.split('_')[1]);
         UserHeal = personIndex;
         console.log(personIndex)
-        await interaction.reply(`You choosed ${bots[personIndex].name} to heal!`);
+        await interaction.reply(`You chose ${bots[personIndex].name} to heal!`);
         wait = false;
     }
     else if (interaction.customId.startsWith('voice'))
@@ -980,7 +980,7 @@ async function MafiaKillDuringNight(){
         const row_2 = new ActionRowBuilder().addComponents(targetbuttons.slice(targetbuttons.length/2,targetbuttons.length)); // 버튼들을 하나의 행으로 그룹화 
         
         await channel_info.send({
-            content: 'Choose a player to detect',
+            content: 'Choose a player to heal',
             components: [row, row_2],
             ephemeral: true,
         });
