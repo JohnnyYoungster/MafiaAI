@@ -47,6 +47,7 @@ let UserKill;
 let UserDetect;
 let UserHeal;
 let wait = true;
+let votingConvo="";
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -93,6 +94,8 @@ const voteMafiaBot = async (bot, personindex,channel) =>
         console.log(response.content)
         personindex = botsWithPlayer.findIndex(bot => bot.name.replace(/\s+/g, '').toLowerCase() === obj.player_to_eliminate.replace(/\s+/g, '').toLowerCase());
       }
+
+      votingConvo += bot.name+":" + "I vote for "+botsWithPlayer[personindex].name+"."+obj.reason+"\n";
 
       console.log(response.content);
       console.log(personindex);
@@ -453,10 +456,11 @@ client.on('interactionCreate', async (interaction) => {
         // await voteMafiaBot(players[0],0,interaction.channel);
         // await voteMafiaBot(players[1],0,interaction.channel);
         // await voteMafiaBot(players[2],0,interaction.channel);
-        
+        votingConvo="";
         for (let i = 0; i < players.length; i++) {
             await voteMafiaBot(players[i], 0, interaction.channel); // 모든 플레이어가 자동으로 투표하도록 변경
         }
+        conversation+=votingConvo;
 
         await interaction.reply({
             content: 'Choose a player to vote for:',
@@ -799,7 +803,7 @@ async function randomStart(message) {
     }
     conversationCount ++;
     //await new Promise(resolve => setTimeout(resolve, 2000));
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, 3000));
   }
   if (conversationCount >= maxConvCountPerDay) {
     // MafiaBot이 메시지를 보냄
@@ -1099,7 +1103,7 @@ async function NotifyNextDay(victimIdx){
         components: [row],
         });
         conversation += nightResult(botsWithPlayer[victimIdx].name);
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
     }
     else{
         console.log("Night Passed!");
@@ -1119,7 +1123,7 @@ async function NotifyNextDay(victimIdx){
         components: [row],
         });
         conversation += nightResult(null);
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
 
