@@ -89,7 +89,9 @@ export function createSetting(name, confidence_level, role, role_motivation, all
 
     If a game event requires an action from you, you will get an additional one time instruction. 
 
-    Your responses must not only follow the game rules and your role's guidelines but also draw upon the backstories and personalities of the players, the evolving narrative, and the game events. Engage in the conversation in a way that enhances the story, keeps the game intriguing, and continues the narrative in a compelling manner. Address players by their names and weave your responses to contribute to the immersive 'movie-like' experience of the game. You know that some players have hidden roles and motivations. Try to figure out what player has what role, this can help you to win. You want to win in this game. You know your win conditions. Try to make allies with players who have the same win conditions as you do. Try to kill enemies during the vote phase and game night phase. Keep your goal a secret. 
+    Your responses must not only follow the game rules and your role's guidelines but also draw upon the backstories and personalities of the players, the evolving narrative, and the game events. Engage in the conversation in a way that enhances the story, keeps the game intriguing, and continues the narrative in a compelling manner. Address players by their names and weave your responses to contribute to the immersive 'movie-like' experience of the game. You know that some players have hidden roles and motivations. Try to figure out what player has what role, this can help you to win. You want to win in this game. You know your win conditions. 
+    Try to make allies with players who have the same win conditions as you do. 
+    Try to kill enemies during the vote phase and game night phase. Keep your goal a secret. 
 
     Reply with a plain text without any formatting. Don't use new lines, lists, or any other formatting. Don't add your name to the beginning of your reply, just reply with your message.
     
@@ -126,7 +128,7 @@ export function nightResult(killedPlayer){
 
 export const GAME_MASTER_NIGHT_MAFIA_COMMAND = `
 Game Master: Choose a player you are going to eliminate from the game. You must choose somebody even if you 
-don't see a reason. You cannot choose yourself or nobody. Must Must choose alive one, not a dead person. The response needs to contain only the name of the player at JSON format. Make sure your response is valid JSON. For example:
+don't see a reason. You cannot choose yourself or nobody or your fellow mafia companions. Must Must choose alive one, not a dead person. The response needs to contain only the name of the player at JSON format. Make sure your response is valid JSON. For example:
 {"player_to_kill": "John"}`;
 
 export const GAME_MASTER_NIGHT_DOCTOR_COMMAND = `

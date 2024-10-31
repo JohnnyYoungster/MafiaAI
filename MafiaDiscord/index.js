@@ -491,7 +491,7 @@ client.on('interactionCreate', async (interaction) => {
         const personIndex = parseInt(interaction.customId.split('_')[1]);
         UserHeal = personIndex;
         console.log(personIndex)
-        await interaction.reply(`You chose ${bots[personIndex].name} to heal!`);
+        await interaction.reply(`You chose ${botsWithPlayer[personIndex].name} to heal!`);
         wait = false;
     }
     else if (interaction.customId.startsWith('voice'))
@@ -527,11 +527,17 @@ class Player {
         this.alive = true;
         this.personality = personality;
         this.confidence = confidence;
+        this.tempConfidence = confidence;
         this.user = false;
         this.known_players = [];
     }
 
+    resetConfidence(){
+        this.tempConfidence=this.confidence;
+    }
+
     speak(conversation) {
+        this.tempConfidence*=0.8;
         const setting = createSetting(this.name, this.confidence, this.role, role_motivations[this.role],
             this.getAllyRoles(), this.getEnemyRoles(), this.getKnownAllies(), this.getOtherPlayers(), "You are in a small rural town.", this.personality);
         const prompt = NPCPrompt(setting);
@@ -576,7 +582,7 @@ class Player {
         const prompt = NPCPrompt(setting, {
             response_format: {type:'json_object',}
         });
-        return prompt(conversation+"\n"+GAME_MASTER_NIGHT_MAFIA_COMMAND);
+        return prompt(conversation+"\n"+GAME_MASTER_NIGHT_MAFIA_COMMAND+'Remember, you cannot choose your fellow mafia members, who are: '+this.getKnownAllies());
     }
 
     detect(conversation){
@@ -704,7 +710,7 @@ fs.readFile('Characters.txt', 'utf8', async (err, data) => {
 });
 
 
-let conversation="Game Master: The day starts and the town is notified from the government that there is a Mafia about to murder all of them. Day 1 discussion ensues. \n";
+let conversation="Game Master: The day starts and the town is notified from the government that there is a Mafia about to murder all of them. Day 1 discussion ensues. Try introducing yourself and talk about the situation for the first day. The lovers should also reveal themselves. \n";
 let lastChosenPlayerName="";
 
 async function changeWebHookName(webhookUrl,newName){
@@ -714,10 +720,19 @@ async function changeWebHookName(webhookUrl,newName){
         console.log(`WebHook name   --> ${newName}`);
 
 }
-function choosePlayer(bots, lastChosenPlayerName) {
+
+const randomIndexes = [0,1,2,3,4,5,6];
+for (let i = randomIndexes.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [randomIndexes[i], randomIndexes[j]] = [randomIndexes[j], randomIndexes[i]];
+}
+
+
+function choosePlayer(bots, lastChosenPlayerName, lastIndex=0) {
   // Calculate the total confidence
+  if(dayTime==1 && lastIndex<7) return botsWithPlayer[randomIndexes[lastIndex]];
   const filteredPlayers= bots.filter(player=> player.name!=lastChosenPlayerName && player.alive);
-  const totalConfidence = filteredPlayers.reduce((total, player) => total + player.confidence, 0);
+  const totalConfidence = filteredPlayers.reduce((total, player) => total + player.tempConfidence, 0);
 
   // Generate a random number between 0 and totalConfidence
   const randomValue = Math.random() * totalConfidence;
@@ -726,7 +741,7 @@ function choosePlayer(bots, lastChosenPlayerName) {
 
   // Select the player based on confidence
   for (const player of filteredPlayers) {
-      cumulativeConfidence += player.confidence;
+      cumulativeConfidence += player.tempConfidence;
       if (randomValue < cumulativeConfidence) {
           return player; // Return the chosen player
       }
@@ -744,6 +759,7 @@ function choosePlayer(bots, lastChosenPlayerName) {
 // }
 
 const maxConvCountPerDay=10;
+let convoCount=0;
 
 async function randomStart(message) {
   while(conversationCount < maxConvCountPerDay && isRunning){
@@ -754,7 +770,8 @@ async function randomStart(message) {
       continue;  // 다음 반복으로 넘어가서 다시 isUserTyping 상태 확인
     }
 
-    const player = choosePlayer(bots,lastChosenPlayerName);
+    const player = choosePlayer(bots,lastChosenPlayerName,convoCount);
+    convoCount+=1;
     lastChosenPlayerName=player.name;
     const response = await player.speak(conversation);
     // console.log(player.name);
@@ -1055,6 +1072,9 @@ async function MafiaKillDuringNight(){
 }
 
 async function NotifyNextDay(victimIdx){
+    for (const bot of bots) {
+        bot.resetConfidence();
+    }
   CheckEndState(1);
   if(endState){
     console.log("Mafia win!");
